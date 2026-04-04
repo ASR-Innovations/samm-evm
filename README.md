@@ -1,3 +1,6 @@
+<img width="1280" height="717" alt="image" src="https://github.com/user-attachments/assets/40b3f60c-056d-4617-bf57-ce9a29b4129e" />
+
+
 # SAMM — Sharded Automated Market Maker
 
 A novel DEX protocol implementing **sharded liquidity pools** with dynamic fee optimisation, TPS-driven auto-scaling, and an integrated arbitrage rebalancer. Live on **RiseChain Testnet**.
