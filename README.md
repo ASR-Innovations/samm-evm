@@ -42,17 +42,9 @@ Throughput benefits:
 
 SAMM introduces a **bounded-ratio polynomial fee function** to balance liquidity across shards.
 
-### Formula:
-
 $$
-\text{Fee}(\Delta) = \frac{R_B}{R_A} \cdot \Delta \cdot \max\left\{ r_{\min}, \min\left\{ r_{\max}, \beta_1 R_A^{\beta_2} R_B^{\beta_3} \Delta^{\beta_4} + \beta_5 \right\} \right\}
+\text{fee} = \max\!\bigl(r_{\min},\; \beta_1 \cdot \tfrac{O_A}{R_A} + r_{\max}\bigr)
 $$
-
-Where:
-- $\Delta$: amount traded
-- $(R_A, R_B\)$: token reserves
-- $(\beta_i)$: tunable coefficients
-- $(r_{\min}$, r_{\max}\): fee ratio bounds
 
 ### Intuition:
 - Larger trades → higher marginal fee
