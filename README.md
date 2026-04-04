@@ -377,9 +377,10 @@ SAMM uses the **Uniswap Trading API** (`trade-api.gateway.uniswap.org/v1`) to:
 
 | Tx Hash | Action |
 |---------|--------|
-| [`0xb451e4da...`](https://sepolia.etherscan.io/tx/0xb451e4da) | Uniswap swap via Trading API (ETH → USDC) |
-| [`0x8c92f0c5...`](https://sepolia.etherscan.io/tx/0x8c92f0c5) | Permit2 approval |
-| [`0xeb9c1ad6...`](https://sepolia.etherscan.io/tx/0xeb9c1ad6) | Forced Uniswap swap test |
+| [`0x126fa86b...`](https://sepolia.etherscan.io/tx/0x126fa86beb07c6dca2114fd7d15c60fe4b998ebaf106038380452d488ad53f95) | Uniswap swap via Trading API (ETH → USDC) |
+| [`0xf543df01...`](https://sepolia.etherscan.io/tx/0xf543df013d72e21dd4f233d68687bb1b3ef6ed6b105eea1832b881dc8da934b8) | Uniswap swap via Trading API (ETH → USDC) |
+| [`0xa80ab036...`](https://sepolia.etherscan.io/tx/0xa80ab036e4e93cefc405) | Uniswap swap via Trading API (ETH → USDC) |
+| [`0xbfaa4472...`](https://sepolia.etherscan.io/tx/0xbfaa4472c32edeae6a6d008173a95e7376378da75c87e581d3b57b4dca8661a5) | Bridge deposit (Sepolia → RiseChain, 0.001 ETH) |
 
 | Endpoint | Description |
 |----------|-------------|
@@ -409,17 +410,19 @@ cre workflow simulate my-workflow --non-interactive --trigger-index 0
 Output:
 ```
 ✓ Workflow compiled
-📊 Price feed | ETH/USD = $2050.38
-📊 Price feed | BTC/USD = $66851.68
+📊 Price feed | ETH/USD = $2056.84
+📊 Price feed | BTC/USD = $66997.67
 📊 Price feed | USDC/USD = $1.00
 📊 Price feed | DAI/USD = $1.00
 ✅ Fetched SAMM data: 5 pairs
+🧠 Step 3: Dynamic Shard Analysis (per-pair, original 🔒 vs dynamic ⚡)
 🔗 MERGE WETH-USDC: 4 → 3 shards — 3 original shards protected
 🔗 MERGE USDC-USDT: 4 → 3 shards — 3 original shards protected
 🔗 MERGE WETH-USDT: 5 → 3 shards — 3 original shards protected
 🔗 MERGE WBTC-USDC: 5 → 3 shards — 3 original shards protected
 🔗 MERGE USDC-DAI: 4 → 3 shards — 3 original shards protected
-Decisions: 0 splits, 5 merges, 0 rebalances
+⚡ Step 5: ChainWrite — 5 mergeShards() calls encoded for DynamicShardOrchestrator
+Decisions: 0 splits, 5 merges, 0 rebalances | ChainWrites: 5 pending
 ✓ Workflow Simulation Result: {...}
 ╭──────────────────────────────────────────────────────╮
 │ Simulation complete! Ready to deploy your workflow?  │
@@ -481,6 +484,52 @@ SAMM has **5 autonomous agents** registered on-chain with ENS-style identities:
 | `ENS_RPC_URL` | ENS | No | Custom ENS provider RPC (defaults to mainnet) |
 | `ENS_BASE_DOMAIN` | ENS | No | Base domain (default: `samm.eth`) |
 | `ENS_REGISTRY_ADDRESS` | ENS | No | Deployed SAMMAgentRegistry address |
+
+---
+
+## Demo & Setup Instructions
+
+### Quick Start (local)
+
+```bash
+git clone https://github.com/ASR-Innovations/samm-evm.git
+cd samm-evm
+npm install
+cp .env.example .env
+# Set PRIVATE_KEY, RISECHAIN_RPC_URL, UNISWAP_API_KEY, SEPOLIA_RPC_URL
+npm start
+```
+
+The server auto-discovers contracts from `deployment-data/`, starts the arb bot + shard manager, and exposes all endpoints on port 3000.
+
+### Run E2E Tests
+
+```bash
+# Read-only mode (no real txs)
+node scripts/uniswap-e2e-flow.js
+
+# Live mode (real Uniswap swaps + bridge deposits on Sepolia)
+node scripts/uniswap-e2e-flow.js --live
+```
+
+### Run CRE Workflow Simulation
+
+```bash
+cd integrations/chainlink-cre-workflow
+npm install
+cre workflow simulate my-workflow --non-interactive --trigger-index 0
+```
+
+### On-Chain Transaction Proof
+
+| Network | Tx Hash | Action |
+|---------|---------|--------|
+| Sepolia | [`0x126fa86b...`](https://sepolia.etherscan.io/tx/0x126fa86beb07c6dca2114fd7d15c60fe4b998ebaf106038380452d488ad53f95) | Uniswap swap (ETH → USDC) via Trading API |
+| Sepolia | [`0xf543df01...`](https://sepolia.etherscan.io/tx/0xf543df013d72e21dd4f233d68687bb1b3ef6ed6b105eea1832b881dc8da934b8) | Uniswap swap (ETH → USDC) via Trading API |
+| Sepolia | [`0xbfaa4472...`](https://sepolia.etherscan.io/tx/0xbfaa4472c32edeae6a6d008173a95e7376378da75c87e581d3b57b4dca8661a5) | Bridge deposit (0.001 ETH, Sepolia → RiseChain) |
+| RiseChain | [`0xCa46f859...`](https://testnet.riselabs.xyz/address/0xCa46f85973d0f13377744fBE8D26ABBdc93a241B) | SAMMAgentRegistry (5 agents, 42 shards) |
+| RiseChain | [`0xc4c6ceAB...`](https://testnet.riselabs.xyz/address/0xc4c6ceABeBBfA1Bf9D219fE80F5b95982664fb94) | SAMMPoolFactory (22 live pools) |
+| RiseChain | [`0x6A45347a...`](https://testnet.riselabs.xyz/address/0x6A45347a8DbC629000F725c544D695209b0c3d00) | CrossPoolRouter |
 
 ---
 

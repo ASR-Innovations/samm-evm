@@ -1,0 +1,182 @@
+Initializing...
+Loading settings...
+Checking RPC connectivity...
+Compiling workflow...
+✓ Workflow compiled
+✓ Simulation limits enabled
+  HTTP: req=10kb resp=100kb timeout=10s | ConfHTTP: req=10kb resp=100kb timeout=10s | Consensus obs=100kb | ChainWrite report=5kb gas=5000000 | WASM binary=100mb compressed=20mb
+  Binary hash: b80a13530305a89978f467e2d57e8382602afd91abfab784cefa41c426cdfc32
+  Config hash: 7cb19fcf25a0526eac88fee354e8c7aa2e45c7445177fef42e859e073e9edd5f
+2026-04-04T12:37:37Z [SIMULATION] Simulator Initialized
+
+2026-04-04T12:37:37Z [SIMULATION] Running trigger trigger=cron-trigger@1.0.0
+2026-04-04T12:37:37Z [USER LOG] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-04-04T12:37:37Z [USER LOG] 🔄 SAMM Shard Orchestrator — CRE Workflow Execution
+2026-04-04T12:37:37Z [USER LOG] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-04-04T12:37:37Z [USER LOG] 📡 Step 1: Reading Chainlink price feeds...
+2026-04-04T12:37:38Z [USER LOG] 📊 Price feed | ETH/USD = $2056.84 | chain=ethereum-testnet-sepolia address=0x694AA1769357215DE4FAC081bf1f309aDC325306
+2026-04-04T12:37:38Z [USER LOG] 📊 Price feed | BTC/USD = $66997.67 | chain=ethereum-testnet-sepolia address=0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43
+2026-04-04T12:37:39Z [USER LOG] 📊 Price feed | USDC/USD = $1.00 | chain=ethereum-testnet-sepolia address=0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E
+2026-04-04T12:37:40Z [USER LOG] 📊 Price feed | DAI/USD = $1.00 | chain=ethereum-testnet-sepolia address=0x14866185B1962B63C3Ea9E03Bc1da838bab34C19
+2026-04-04T12:37:40Z [USER LOG] 📊 Step 2: Fetching SAMM pool data...
+2026-04-04T12:37:47Z [USER LOG] ✅ Fetched SAMM data: 5 pairs
+2026-04-04T12:37:47Z [USER LOG] 🧮 Step 3: Dynamic Shard Analysis
+2026-04-04T12:37:47Z [USER LOG] ────────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] Config: splitThreshold=250 TPS/shard
+2026-04-04T12:37:47Z [USER LOG] mergeThreshold=62.5 TPS/shard
+2026-04-04T12:37:47Z [USER LOG] minShards=3 (Small/Medium/Large PROTECTED)
+2026-04-04T12:37:47Z [USER LOG] maxShards=10
+2026-04-04T12:37:47Z [USER LOG] minDeviation=0.3% for arb signal
+2026-04-04T12:37:47Z [USER LOG] Formula: n = clamp(⌈TPS / 250⌉, 3, 10)
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] ┌── WETH-USDC ──────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] │ Shards: 4 total (3 original + 1 dynamic)
+2026-04-04T12:37:47Z [USER LOG] │ TVL:    $6.61M across 4 shards
+2026-04-04T12:37:47Z [USER LOG] │ TPS:    0.0 total → 0.0 per shard
+2026-04-04T12:37:47Z [USER LOG] │   shard[0] 🔒 original | reserveA=407.90 reserveB=837128.79 spot=0.000487
+2026-04-04T12:37:47Z [USER LOG] │   shard[1] 🔒 original | reserveA=445.19 reserveB=915730.16 spot=0.000486
+2026-04-04T12:37:47Z [USER LOG] │   shard[2] 🔒 original | reserveA=485.04 reserveB=997707.03 spot=0.000486
+2026-04-04T12:37:47Z [USER LOG] │   shard[3] ⚡ dynamic | reserveA=269.41 reserveB=554170.15 spot=0.000486
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 🔗 DECISION: MERGE — remove 1 dynamic shard(s)
+2026-04-04T12:37:47Z [USER LOG] │    TPS/shard 0.0 ≤ 62.5 threshold → underutilized
+2026-04-04T12:37:47Z [USER LOG] │    Target: 3 shards (3 original PROTECTED, 0 dynamic kept)
+2026-04-04T12:37:47Z [USER LOG] │    ⚠️ 3 original shards (Small/Medium/Large) are NEVER removed
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 📐 If TPS were 1001: would scale to 5 shards (+1 new)
+2026-04-04T12:37:47Z [USER LOG] └──────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] ┌── USDC-USDT ──────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] │ Shards: 4 total (3 original + 1 dynamic)
+2026-04-04T12:37:47Z [USER LOG] │ TVL:    $6.50M across 4 shards
+2026-04-04T12:37:47Z [USER LOG] │ TPS:    0.0 total → 0.0 per shard
+2026-04-04T12:37:47Z [USER LOG] │   shard[0] 🔒 original | reserveA=824698.71 reserveB=825528.05 spot=0.998995
+2026-04-04T12:37:47Z [USER LOG] │   shard[1] 🔒 original | reserveA=899928.34 reserveB=900689.17 spot=0.999155
+2026-04-04T12:37:47Z [USER LOG] │   shard[2] 🔒 original | reserveA=1121255.87 reserveB=1119972.72 spot=1.001146
+2026-04-04T12:37:47Z [USER LOG] │   shard[3] ⚡ dynamic | reserveA=405012.42 reserveB=405280.51 spot=0.999339
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 🔗 DECISION: MERGE — remove 1 dynamic shard(s)
+2026-04-04T12:37:47Z [USER LOG] │    TPS/shard 0.0 ≤ 62.5 threshold → underutilized
+2026-04-04T12:37:47Z [USER LOG] │    Target: 3 shards (3 original PROTECTED, 0 dynamic kept)
+2026-04-04T12:37:47Z [USER LOG] │    ⚠️ 3 original shards (Small/Medium/Large) are NEVER removed
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 📐 If TPS were 1001: would scale to 5 shards (+1 new)
+2026-04-04T12:37:47Z [USER LOG] └──────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] ┌── WETH-USDT ──────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] │ Shards: 5 total (3 original + 2 dynamic)
+2026-04-04T12:37:47Z [USER LOG] │ TVL:    $11.62M across 5 shards
+2026-04-04T12:37:47Z [USER LOG] │ TPS:    0.0 total → 0.0 per shard
+2026-04-04T12:37:47Z [USER LOG] │   shard[0] 🔒 original | reserveA=408.44 reserveB=839008.39 spot=0.000487
+2026-04-04T12:37:47Z [USER LOG] │   shard[1] 🔒 original | reserveA=445.63 reserveB=915402.41 spot=0.000487
+2026-04-04T12:37:47Z [USER LOG] │   shard[2] 🔒 original | reserveA=554.69 reserveB=1139432.74 spot=0.000487
+2026-04-04T12:37:47Z [USER LOG] │   shard[3] ⚡ dynamic | reserveA=200.46 reserveB=411775.44 spot=0.000487
+2026-04-04T12:37:47Z [USER LOG] │   shard[4] ⚡ dynamic | reserveA=1219.26 reserveB=2501616.54 spot=0.000487
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 🔗 DECISION: MERGE — remove 2 dynamic shard(s)
+2026-04-04T12:37:47Z [USER LOG] │    TPS/shard 0.0 ≤ 62.5 threshold → underutilized
+2026-04-04T12:37:47Z [USER LOG] │    Target: 3 shards (3 original PROTECTED, 0 dynamic kept)
+2026-04-04T12:37:47Z [USER LOG] │    ⚠️ 3 original shards (Small/Medium/Large) are NEVER removed
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 📐 If TPS were 1251: would scale to 6 shards (+1 new)
+2026-04-04T12:37:47Z [USER LOG] └──────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] ┌── WBTC-USDC ──────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] │ Shards: 5 total (3 original + 2 dynamic)
+2026-04-04T12:37:47Z [USER LOG] │ TVL:    $11.54M across 5 shards
+2026-04-04T12:37:47Z [USER LOG] │ TPS:    0.0 total → 0.0 per shard
+2026-04-04T12:37:47Z [USER LOG] │   shard[0] 🔒 original | reserveA=829194.83 reserveB=12.40 spot=66871.149037
+2026-04-04T12:37:47Z [USER LOG] │   shard[1] 🔒 original | reserveA=904548.24 reserveB=13.53 spot=66850.145864
+2026-04-04T12:37:47Z [USER LOG] │   shard[2] 🔒 original | reserveA=1126056.21 reserveB=16.84 spot=66863.612387
+2026-04-04T12:37:47Z [USER LOG] │   shard[3] ⚡ dynamic | reserveA=406869.20 reserveB=6.09 spot=66849.329689
+2026-04-04T12:37:47Z [USER LOG] │   shard[4] ⚡ dynamic | reserveA=2500000.00 reserveB=37.38 spot=66879.999991
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 🔗 DECISION: MERGE — remove 2 dynamic shard(s)
+2026-04-04T12:37:47Z [USER LOG] │    TPS/shard 0.0 ≤ 62.5 threshold → underutilized
+2026-04-04T12:37:47Z [USER LOG] │    Target: 3 shards (3 original PROTECTED, 0 dynamic kept)
+2026-04-04T12:37:47Z [USER LOG] │    ⚠️ 3 original shards (Small/Medium/Large) are NEVER removed
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 📐 If TPS were 1251: would scale to 6 shards (+1 new)
+2026-04-04T12:37:47Z [USER LOG] └──────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] ┌── USDC-DAI ──────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] │ Shards: 4 total (3 original + 1 dynamic)
+2026-04-04T12:37:47Z [USER LOG] │ TVL:    $6.50M across 4 shards
+2026-04-04T12:37:47Z [USER LOG] │ TPS:    0.0 total → 0.0 per shard
+2026-04-04T12:37:47Z [USER LOG] │   shard[0] 🔒 original | reserveA=824711.30 reserveB=824562.32 spot=1.000181
+2026-04-04T12:37:47Z [USER LOG] │   shard[1] 🔒 original | reserveA=899737.89 reserveB=900358.51 spot=0.999311
+2026-04-04T12:37:47Z [USER LOG] │   shard[2] 🔒 original | reserveA=1120236.39 reserveB=1120086.39 spot=1.000134
+2026-04-04T12:37:47Z [USER LOG] │   shard[3] ⚡ dynamic | reserveA=405017.15 reserveB=405063.34 spot=0.999886
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 🔗 DECISION: MERGE — remove 1 dynamic shard(s)
+2026-04-04T12:37:47Z [USER LOG] │    TPS/shard 0.0 ≤ 62.5 threshold → underutilized
+2026-04-04T12:37:47Z [USER LOG] │    Target: 3 shards (3 original PROTECTED, 0 dynamic kept)
+2026-04-04T12:37:47Z [USER LOG] │    ⚠️ 3 original shards (Small/Medium/Large) are NEVER removed
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 📈 Oracle rate: USDC/DAI = 1.000005 (Chainlink)
+2026-04-04T12:37:47Z [USER LOG] │    Max shard deviation: 0.0695% (threshold: 0.3%)
+2026-04-04T12:37:47Z [USER LOG] │    ✅ All shards within tolerance — no arb needed
+2026-04-04T12:37:47Z [USER LOG] │
+2026-04-04T12:37:47Z [USER LOG] │ 📐 If TPS were 1001: would scale to 5 shards (+1 new)
+2026-04-04T12:37:47Z [USER LOG] └──────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] 📊 Totals: 22 shards, $42.8M TVL across 5 pairs
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] 📋 Step 4: Formal Shard Decisions...
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE WETH-USDC: 4 → 3 shards (TPS: 0.0) — 3 original shards protected
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE USDC-USDT: 4 → 3 shards (TPS: 0.0) — 3 original shards protected
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE WETH-USDT: 5 → 3 shards (TPS: 0.0) — 3 original shards protected
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE WBTC-USDC: 5 → 3 shards (TPS: 0.0) — 3 original shards protected
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE USDC-DAI: 4 → 3 shards (TPS: 0.0) — 3 original shards protected
+2026-04-04T12:37:47Z [USER LOG] ⚡ Step 5: ChainWrite — Execute decisions via DynamicShardOrchestrator
+2026-04-04T12:37:47Z [USER LOG] ────────────────────────────────────────────────────
+2026-04-04T12:37:47Z [USER LOG] Target: DynamicShardOrchestrator @ 0x93174f86F57A97827680c279e07704AbE2a0b0c0
+2026-04-04T12:37:47Z [USER LOG] Chain:  RiseChain Testnet (chainId 11155931)
+2026-04-04T12:37:47Z [USER LOG] Guard:  onlyKeeper modifier — DON address must be registered keeper
+2026-04-04T12:37:47Z [USER LOG] 
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE WETH-USDC:
+2026-04-04T12:37:47Z [USER LOG] mergeShards(0x07Dca56eA3377C04295f7A835225c86fc968d347, 0x1BdBf2fD483633f7BB5Bf34E94E80fF550D3c6b9)
+2026-04-04T12:37:47Z [USER LOG] → Drain dynamic shard into original, preserving total TVL
+2026-04-04T12:37:47Z [USER LOG] Calldata: 0x474676af00000000000000000000000007dca56ea3377c04295f7a835225c86f...
+2026-04-04T12:37:47Z [USER LOG] 🔗 MERGE USDC-USDT:
+2026-04-04T12:37:47Z [USER LOG] mergeShards(0xaEe1aa8AC23c12b1A4db1E0E1F6EEc5BAc72368e, 0x16C8E409ab7aaAD129B342b2fC5e78725e5Be424)
+2026-04-04T12:37:47Z [USER LOG] → Drain dynamic shard into original, preserving total TVL
+2026-04-04T12:37:47Z [USER LOG] Calldata: 0x474676af000000000000000000000000aee1aa8ac23c12b1a4db1e0e1f6eec5b...
+2026-04-04T12:37:48Z [USER LOG] 🔗 MERGE WETH-USDT:
+2026-04-04T12:37:48Z [USER LOG] mergeShards(0xb5C4c1D6C7c1e40d92203C9E5e58fEb4058731e8, 0x6bf53263ad782621aE7DaAE8557EBA21B102acfB)
+2026-04-04T12:37:48Z [USER LOG] → Drain dynamic shard into original, preserving total TVL
+2026-04-04T12:37:48Z [USER LOG] Calldata: 0x474676af000000000000000000000000b5c4c1d6c7c1e40d92203c9e5e58feb4...
+2026-04-04T12:37:48Z [USER LOG] 🔗 MERGE WBTC-USDC:
+2026-04-04T12:37:48Z [USER LOG] mergeShards(0x30Cef3E3bc4A79E39371c46255e2e12791347393, 0xf5660c5d7955dCc112F9361BD5BA70749B5e5a1d)
+2026-04-04T12:37:48Z [USER LOG] → Drain dynamic shard into original, preserving total TVL
+2026-04-04T12:37:48Z [USER LOG] Calldata: 0x474676af00000000000000000000000030cef3e3bc4a79e39371c46255e2e127...
+2026-04-04T12:37:48Z [USER LOG] 🔗 MERGE USDC-DAI:
+2026-04-04T12:37:48Z [USER LOG] mergeShards(0x3303B990798521226981f7c1f60BcC8557651DFd, 0x3932ecc1e7A6C350948b3A966CCed8Fbc51e9420)
+2026-04-04T12:37:48Z [USER LOG] → Drain dynamic shard into original, preserving total TVL
+2026-04-04T12:37:48Z [USER LOG] Calldata: 0x474676af0000000000000000000000003303b990798521226981f7c1f60bcc85...
+2026-04-04T12:37:48Z [USER LOG] 
+2026-04-04T12:37:48Z [USER LOG] 📡 Relaying execution plan to SAMM API...
+2026-04-04T12:37:48Z [USER LOG] 📬 API response: 404
+2026-04-04T12:37:48Z [USER LOG] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2026-04-04T12:37:48Z [USER LOG] 📋 FINAL REPORT
+2026-04-04T12:37:48Z [USER LOG] Chainlink Prices: ETH/USD=$2056.84, BTC/USD=$66997.67, USDC/USD=$1.00, DAI/USD=$1.00
+2026-04-04T12:37:48Z [USER LOG] Pool State: 22 shards, $42.8M TVL
+2026-04-04T12:37:48Z [USER LOG] Decisions: 0 SPLIT, 5 MERGE, 0 REBALANCE, 0 NO_ACTION
+2026-04-04T12:37:48Z [USER LOG] ChainWrites: 5 pending → DynamicShardOrchestrator @ 0x93174f86F57A97827680c279e07704AbE2a0b0c0
+2026-04-04T12:37:48Z [USER LOG] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Workflow Simulation Result:
+"{\n  \"timestamp\": \"2026-04-04T07:07:48.067Z\",\n  \"workflow\": \"samm-shard-orchestrator\",\n  \"version\": \"1.0.0\",\n  \"config\": {\n    \"splitTpsThreshold\": 250,\n    \"mergeTpsThreshold\": 62.5,\n    \"minShardsPerPair\": 3,\n    \"maxShardsPerPair\": 10,\n    \"minDeviationPct\": 0.3,\n    \"formula\": \"n = clamp(ceil(TPS / 250), 3, 10)\"\n  },\n  \"prices\": [\n    {\n      \"name\": \"ETH/USD\",\n      \"price\": 2056.83565671,\n      \"raw\": \"205683565671\",\n      \"feed\": \"0x694AA1769357215DE4FAC081bf1f309aDC325306\",\n      \"decimals\": 8\n    },\n    {\n      \"name\": \"BTC/USD\",\n      \"price\": 66997.67,\n      \"raw\": \"6699767000000\",\n      \"feed\": \"0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43\",\n      \"decimals\": 8\n    },\n    {\n      \"name\": \"USDC/USD\",\n      \"price\": 0.99994557,\n      \"raw\": \"99994557\",\n      \"feed\": \"0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E\",\n      \"decimals\": 8\n    },\n    {\n      \"name\": \"DAI/USD\",\n      \"price\": 0.99994027,\n      \"raw\": \"99994027\",\n      \"feed\": \"0x14866185B1962B63C3Ea9E03Bc1da838bab34C19\",\n      \"decimals\": 8\n    }\n  ],\n  \"pairAnalysis\": [\n    {\n      \"pair\": \"WETH-USDC\",\n      \"shardCount\": 4,\n      \"originalShards\": 3,\n      \"dynamicShards\": 1,\n      \"totalTVL\": 6608821,\n      \"tps\": 0,\n      \"tpsPerShard\": 0\n    },\n    {\n      \"pair\": \"USDC-USDT\",\n      \"shardCount\": 4,\n      \"originalShards\": 3,\n      \"dynamicShards\": 1,\n      \"totalTVL\": 6501894,\n      \"tps\": 0,\n      \"tpsPerShard\": 0\n    },\n    {\n      \"pair\": \"WETH-USDT\",\n      \"shardCount\": 5,\n      \"originalShards\": 3,\n      \"dynamicShards\": 2,\n      \"totalTVL\": 11619945,\n      \"tps\": 0,\n      \"tpsPerShard\": 0\n    },\n    {\n      \"pair\": \"WBTC-USDC\",\n      \"shardCount\": 5,\n      \"originalShards\": 3,\n      \"dynamicShards\": 2,\n      \"totalTVL\": 11544144,\n      \"tps\": 0,\n      \"tpsPerShard\": 0\n    },\n    {\n      \"pair\": \"USDC-DAI\",\n      \"shardCount\": 4,\n      \"originalShards\": 3,\n      \"dynamicShards\": 1,\n      \"totalTVL\": 6499686,\n      \"tps\": 0,\n      \"tpsPerShard\": 0\n    }\n  ],\n  \"decisions\": [\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"WETH-USDC\",\n      \"reason\": \"TPS/shard 0.0 ≤ 62.5 — remove dynamic shards only (3 original shards protected)\",\n      \"currentShards\": 4,\n      \"targetShards\": 3,\n      \"tps\": 0\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"USDC-USDT\",\n      \"reason\": \"TPS/shard 0.0 ≤ 62.5 — remove dynamic shards only (3 original shards protected)\",\n      \"currentShards\": 4,\n      \"targetShards\": 3,\n      \"tps\": 0\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"WETH-USDT\",\n      \"reason\": \"TPS/shard 0.0 ≤ 62.5 — remove dynamic shards only (3 original shards protected)\",\n      \"currentShards\": 5,\n      \"targetShards\": 3,\n      \"tps\": 0\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"WBTC-USDC\",\n      \"reason\": \"TPS/shard 0.0 ≤ 62.5 — remove dynamic shards only (3 original shards protected)\",\n      \"currentShards\": 5,\n      \"targetShards\": 3,\n      \"tps\": 0\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"USDC-DAI\",\n      \"reason\": \"TPS/shard 0.0 ≤ 62.5 — remove dynamic shards only (3 original shards protected)\",\n      \"currentShards\": 4,\n      \"targetShards\": 3,\n      \"tps\": 0\n    }\n  ],\n  \"executionPlan\": [\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"WETH-USDC\",\n      \"fn\": \"mergeShards\",\n      \"args\": [\n        \"0x07Dca56eA3377C04295f7A835225c86fc968d347\",\n        \"0x1BdBf2fD483633f7BB5Bf34E94E80fF550D3c6b9\"\n      ],\n      \"calldata\": \"0x474676af00000000000000000000000007dca56ea3377c04295f7a835225c86fc968d3470000000000000000000000001bdbf2fd483633f7bb5bf34e94e80ff550d3c6b9\"\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"USDC-USDT\",\n      \"fn\": \"mergeShards\",\n      \"args\": [\n        \"0xaEe1aa8AC23c12b1A4db1E0E1F6EEc5BAc72368e\",\n        \"0x16C8E409ab7aaAD129B342b2fC5e78725e5Be424\"\n      ],\n      \"calldata\": \"0x474676af000000000000000000000000aee1aa8ac23c12b1a4db1e0e1f6eec5bac72368e00000000000000000000000016c8e409ab7aaad129b342b2fc5e78725e5be424\"\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"WETH-USDT\",\n      \"fn\": \"mergeShards\",\n      \"args\": [\n        \"0xb5C4c1D6C7c1e40d92203C9E5e58fEb4058731e8\",\n        \"0x6bf53263ad782621aE7DaAE8557EBA21B102acfB\"\n      ],\n      \"calldata\": \"0x474676af000000000000000000000000b5c4c1d6c7c1e40d92203c9e5e58feb4058731e80000000000000000000000006bf53263ad782621ae7daae8557eba21b102acfb\"\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"WBTC-USDC\",\n      \"fn\": \"mergeShards\",\n      \"args\": [\n        \"0x30Cef3E3bc4A79E39371c46255e2e12791347393\",\n        \"0xf5660c5d7955dCc112F9361BD5BA70749B5e5a1d\"\n      ],\n      \"calldata\": \"0x474676af00000000000000000000000030cef3e3bc4a79e39371c46255e2e12791347393000000000000000000000000f5660c5d7955dcc112f9361bd5ba70749b5e5a1d\"\n    },\n    {\n      \"type\": \"MERGE\",\n      \"pair\": \"USDC-DAI\",\n      \"fn\": \"mergeShards\",\n      \"args\": [\n        \"0x3303B990798521226981f7c1f60BcC8557651DFd\",\n        \"0x3932ecc1e7A6C350948b3A966CCed8Fbc51e9420\"\n      ],\n      \"calldata\": \"0x474676af0000000000000000000000003303b990798521226981f7c1f60bcc8557651dfd0000000000000000000000003932ecc1e7a6c350948b3a966cced8fbc51e9420\"\n    }\n  ],\n  \"orchestrator\": {\n    \"address\": \"0x93174f86F57A97827680c279e07704AbE2a0b0c0\",\n    \"chain\": \"RiseChain Testnet (11155931)\",\n    \"functions\": [\n      \"splitShard(address,uint256)\",\n      \"mergeShards(address,address)\",\n      \"rebalanceLiquidity(address,address,uint256)\"\n    ]\n  },\n  \"summary\": {\n    \"totalPairs\": 5,\n    \"totalShards\": 22,\n    \"totalTVL\": 42774490,\n    \"totalDecisions\": 5,\n    \"splits\": 0,\n    \"merges\": 5,\n    \"rebalances\": 0,\n    \"noAction\": 0,\n    \"chainWritesPending\": 5\n  }\n}"
+
+2026-04-04T12:37:48Z [SIMULATION] Execution finished signal received
+2026-04-04T12:37:48Z [SIMULATION] Skipping WorkflowEngineV2
+
+╭──────────────────────────────────────────────────────╮
+│ Simulation complete! Ready to deploy your workflow?  │
+│                                                      │
+│ Run cre account access to request deployment access. │
+╰──────────────────────────────────────────────────────╯
+
+⚠️  Update available! You’re running 1.8.0, but 1.9.0 is the latest.
+Run `cre update` or visit https://github.com/smartcontractkit/cre-cli/releases to upgrade.
+

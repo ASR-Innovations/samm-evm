@@ -46,5 +46,7 @@ deployments/
 # Kiro (AI IDE)
 .kiro/
 
-# Test results (auto-generated)
+# Test results (auto-generated, keep key logs for submission proof)
 test-results/
+!test-results/cre-simulation-output.txt
+!test-results/uniswap-e2e-flow-1775286373598.log
