@@ -13,6 +13,11 @@ const path = require('path');
 const ArbitrageBot = require('./arbitrage-bot');
 const DynamicShardManager = require('./dynamic-shard-manager');
 const TxQueue = require('./tx-queue');
+const { UniswapQuoter } = require('./integrations/uniswap-client');
+const { ChainlinkPriceOracle } = require('./integrations/chainlink-price');
+const { ENSAgentRegistry } = require('./integrations/ens-agent-registry');
+const UniswapSepoliaSwap = require('./integrations/uniswap-sepolia-swap');
+const RiseChainBridge = require('./integrations/risechain-bridge');
 require('dotenv').config();
 
 // ─── Process-level error handlers (prevent crash on RPC 429 etc) ────
@@ -65,6 +70,27 @@ const tokens = {};
 const poolCache = new Map();
 let arbitrageBot = null;
 let shardManager = null;
+const uniswapQuoter = new UniswapQuoter(process.env.UNISWAP_API_KEY);
+const chainlinkOracle = new ChainlinkPriceOracle(process.env.SEPOLIA_RPC_URL);
+const ENS_RPC_URL = process.env.ENS_RPC_URL || 'https://ethereum.publicnode.com';
+const ensProvider = process.env.ENABLE_ENS === 'false' ? null : new ethers.JsonRpcProvider(ENS_RPC_URL);
+const ensRegistry = process.env.ENABLE_ENS === 'false' ? null : new ENSAgentRegistry({
+  registryAddress: process.env.ENS_REGISTRY_ADDRESS,
+  registryProvider: provider,
+  registrySigner: wallet,
+  ensProvider,
+  baseDomain: process.env.ENS_BASE_DOMAIN || 'samm.eth',
+});
+let ensSyncTimer = null;
+
+// ─── Uniswap Sepolia Swap & Bridge ──────────────────────────────
+const sepoliaRpc = process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+const uniswapSepolia = process.env.PRIVATE_KEY
+  ? new UniswapSepoliaSwap(process.env.PRIVATE_KEY, sepoliaRpc, process.env.UNISWAP_API_KEY)
+  : null;
+const riseChainBridge = process.env.PRIVATE_KEY
+  ? new RiseChainBridge(process.env.PRIVATE_KEY, sepoliaRpc, RPC_URL)
+  : null;
 
 // ABIs
 const POOL_ABI = [
@@ -135,6 +161,13 @@ async function initialize() {
 
   if (!wallet) {
     console.log('\n⏸️  No PRIVATE_KEY — read-only mode (no arb bot, no shard manager)');
+    if (ensRegistry) {
+      try {
+        await syncENSRegistry();
+      } catch (e) {
+        console.error('⚠️  ENS sync (read-only) failed:', e.message?.slice(0, 100));
+      }
+    }
     return;
   }
 
@@ -156,6 +189,22 @@ async function initialize() {
       try { await shardManager.start(); }
       catch (e) { console.error('⚠️  Shard manager error (non-fatal):', e.message?.slice(0, 100)); }
     }, 5000);
+  }
+
+  if (ensRegistry) {
+    // Run ENS sync in background — don't block server startup
+    (async () => {
+      try {
+        await syncENSRegistry();
+        ensSyncTimer = setInterval(() => {
+          syncENSRegistry().catch((e) => {
+            console.error('⚠️  ENS periodic sync failed:', e.message?.slice(0, 100));
+          });
+        }, parseInt(process.env.ENS_SYNC_INTERVAL_MS || '120000'));
+      } catch (e) {
+        console.error('⚠️  ENS sync init failed:', e.message?.slice(0, 100));
+      }
+    })();
   }
 }
 
@@ -205,6 +254,74 @@ function buildHops(routeArray, amountOut) {
   return hops;
 }
 
+async function resolveAddressInput(addressOrEns) {
+  if (ethers.isAddress(addressOrEns)) return { address: addressOrEns, ens: null };
+  if (!ensRegistry || !addressOrEns?.toLowerCase()?.endsWith('.eth')) {
+    throw new Error('Invalid address');
+  }
+  const resolved = await ensRegistry.resolveAddress(addressOrEns);
+  if (!resolved) throw new Error(`Could not resolve ENS name: ${addressOrEns}`);
+  return { address: resolved, ens: addressOrEns.toLowerCase() };
+}
+
+function normalizeShardEnsName(pair, tier) {
+  const safePair = pair.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const safeTier = tier.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  return `${safeTier}.${safePair}.${process.env.ENS_BASE_DOMAIN || 'samm.eth'}`;
+}
+
+async function syncENSRegistry() {
+  if (!ensRegistry || !wallet) return;
+
+  const arbStats = arbitrageBot?.stats || { cycles: 0, swaps: 0, totalUSD: 0, failures: 0 };
+  const shardStatus = shardManager?.getStatus?.() || {};
+
+  await ensRegistry.registerAgent({
+    name: 'arb-bot',
+    ensName: process.env.ENS_ARB_BOT_NAME || 'arb-bot',
+    agentAddress: wallet.address,
+    role: 'arbitrage-bot',
+    textRecords: {
+      'com.samm.min-deviation': '0.30%',
+      'com.samm.rebalance-target': '50%',
+      'com.samm.cooldown-cycles': '3',
+      'com.samm.oracle-source': arbitrageBot?.oracleSource || 'coingecko',
+      'com.samm.total-swaps': arbStats.swaps,
+      'com.samm.total-volume-usd': Number(arbStats.totalUSD || 0).toFixed(2),
+    },
+  });
+
+  await ensRegistry.registerAgent({
+    name: 'shard-manager',
+    ensName: process.env.ENS_SHARD_MANAGER_NAME || 'shard-manager',
+    agentAddress: wallet.address,
+    role: 'dynamic-shard-manager',
+    textRecords: {
+      'com.samm.target-tps-per-shard': shardStatus.PER_SHARD_TPS || 50,
+      'com.samm.max-shards-per-pair': shardStatus.MAX_SHARDS_PER_PAIR || 10,
+      'com.samm.running': !!shardManager?.isRunning,
+    },
+  });
+
+  for (const [pair, shards] of Object.entries(deployment.contracts.shards)) {
+    for (const shard of shards) {
+      await ensRegistry.registerShard({
+        pair,
+        tier: shard.name,
+        ensName: normalizeShardEnsName(pair, shard.name),
+        shardAddress: shard.address,
+        active: true,
+      });
+    }
+  }
+
+  await ensRegistry.updateAgentStats('arb-bot', {
+    'com.samm.total-cycles': arbStats.cycles,
+    'com.samm.failures': arbStats.failures,
+    'com.samm.last-sync': new Date().toISOString(),
+  });
+}
+
 // ═════════════════════════════════════════════════════════════════
 //  ENDPOINTS
 // ═════════════════════════════════════════════════════════════════
@@ -217,6 +334,7 @@ app.get('/health', async (req, res) => {
     oraclePrices, wallet: wallet?.address || null,
     arbitrageBot: arbitrageBot ? { running: arbitrageBot.isRunning, stats: arbitrageBot.stats } : { enabled: false },
     shardManager: shardManager ? { running: shardManager.isRunning } : { enabled: false },
+    ens: ensRegistry ? ensRegistry.status() : { enabled: false },
     txQueue: txQueue?.getStats() || null,
   });
 });
@@ -245,6 +363,30 @@ app.get('/pools', async (req, res) => {
       pools.push({ pair, shards: sd, totalLiquidityUSD: sd.reduce((a, b) => a + b.liquidityUSD, 0) });
     }
     res.json({ pools, totalPairs: pools.length, totalShards: pools.reduce((a, p) => a + p.shards.length, 0) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── All pools (flat format for CRE workflow) ──
+app.get('/pools/all', async (req, res) => {
+  try {
+    await refreshOracle();
+    const pools = [];
+    for (const [pair, shards] of Object.entries(deployment.contracts.shards)) {
+      const [tokenA, tokenB] = pair.split('-');
+      for (const s of shards) {
+        const pd = await getPoolData(s.address);
+        const liq = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1) +
+                    parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
+        pools.push({
+          pair, shard: s.name, address: s.address,
+          tokenA, tokenB,
+          reserveA: pd.reserveA, reserveB: pd.reserveB,
+          liquidityUSD: Math.round(liq),
+          tps: shardManager?._pairTPS?.[pair]?.tps || 0,
+        });
+      }
+    }
+    res.json({ pools, count: pools.length, timestamp: Date.now() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -391,7 +533,7 @@ app.post('/quote', async (req, res) => {
 app.post('/swap', async (req, res) => {
   if (!wallet) return res.status(400).json({ error: 'No wallet — read-only mode' });
   try {
-    const { tokenIn, tokenOut, route, amountOut, slippagePct } = req.body;
+    const { tokenIn, tokenOut, route, amountOut, slippagePct, recipient } = req.body;
     if (!amountOut) return res.status(400).json({ error: 'Missing: amountOut' });
     const slip = parseFloat(slippagePct || '1.0');
 
@@ -402,6 +544,8 @@ app.post('/swap', async (req, res) => {
     const hops = buildHops(routeArr, amountOut);
     const q = await router.quoteSwap(hops);
     const maxIn = q.expectedAmountIn * BigInt(Math.round(10000 + slip * 100)) / 10000n;
+    const recipientInput = recipient || wallet.address;
+    const resolvedRecipient = await resolveAddressInput(recipientInput);
 
     // Ensure approval
     const tIn = tokens[routeArr[0]];
@@ -417,7 +561,7 @@ app.post('/swap', async (req, res) => {
 
     // Execute
     const result = await txQueue.send(
-      (nonce) => router.executeSwap(hops, maxIn, wallet.address, { nonce, gasLimit: 800_000 }),
+      (nonce) => router.executeSwap(hops, maxIn, resolvedRecipient.address, { nonce, gasLimit: 800_000 }),
       `swap ${routeArr.join('→')}`
     );
     if (!result.success) return res.status(500).json({ error: result.error });
@@ -426,6 +570,8 @@ app.post('/swap', async (req, res) => {
     res.json({
       success: true, txHash: result.txHash, blockNumber: result.receipt.blockNumber,
       route: routeArr, amountOut, amountIn: amtIn,
+      recipient: resolvedRecipient.address,
+      recipientENS: resolvedRecipient.ens,
       selectedShards: q.selectedShards.map(a => findShardName(a)),
       gasUsed: result.receipt.gasUsed.toString(),
     });
@@ -472,25 +618,37 @@ app.get('/price/:tokenA/:tokenB', async (req, res) => {
 app.get('/balance/:address/:token', async (req, res) => {
   try {
     const { address, token } = req.params;
-    if (!ethers.isAddress(address)) return res.status(400).json({ error: 'Invalid address' });
+    const resolved = await resolveAddressInput(address);
     const t = tokens[token];
     if (!t) return res.status(400).json({ error: 'Invalid token' });
-    const bal = await t.contract.balanceOf(address);
-    res.json({ address, token, balance: ethers.formatUnits(bal, t.decimals), balanceRaw: bal.toString() });
+    const bal = await t.contract.balanceOf(resolved.address);
+    res.json({
+      address: resolved.address,
+      input: address,
+      resolvedFromENS: resolved.ens,
+      token,
+      balance: ethers.formatUnits(bal, t.decimals),
+      balanceRaw: bal.toString(),
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/balances/:address', async (req, res) => {
   try {
     const { address } = req.params;
-    if (!ethers.isAddress(address)) return res.status(400).json({ error: 'Invalid address' });
+    const resolved = await resolveAddressInput(address);
     const bals = {};
     for (const [sym, t] of Object.entries(tokens)) {
-      const bal = await t.contract.balanceOf(address);
+      const bal = await t.contract.balanceOf(resolved.address);
       bals[sym] = { balance: ethers.formatUnits(bal, t.decimals), balanceRaw: bal.toString(),
         decimals: t.decimals, address: t.address };
     }
-    res.json({ address, balances: bals });
+    res.json({
+      address: resolved.address,
+      input: address,
+      resolvedFromENS: resolved.ens,
+      balances: bals,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -521,6 +679,240 @@ app.get('/stats', async (req, res) => {
       orchestrator: deployment.contracts.orchestrator || null,
       oraclePrices,
     });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Uniswap Comparison ─────────────────────────────────────────
+
+// Helper: get a SAMM quote in the format needed for comparison
+async function getSAMMQuoteForComparison(tokenIn, tokenOut, amountOut) {
+  const tIn = tokens[tokenIn], tOut = tokens[tokenOut];
+  if (!tIn || !tOut) return null;
+  try {
+    const hops = [{ tokenIn: tIn.address, tokenOut: tOut.address,
+      amountOut: ethers.parseUnits(amountOut.toString(), tOut.decimals) }];
+    const q = await router.quoteSwap(hops);
+    const amtIn = parseFloat(ethers.formatUnits(q.expectedAmountIn, tIn.decimals));
+    const fee = parseFloat(ethers.formatUnits(q.hopFees[0], tIn.decimals));
+    return {
+      amountIn: amtIn.toFixed(8),
+      amountOut: amountOut.toString(),
+      fee: fee.toFixed(8),
+      feePct: ((fee / amtIn) * 100).toFixed(4),
+      effectiveRate: (parseFloat(amountOut) / amtIn).toFixed(8),
+      shard: findShardName(q.selectedShards[0]),
+      shardAddress: q.selectedShards[0],
+      priceImpact: `${(Number(q.priceImpacts[0]) / 10000).toFixed(2)}%`,
+    };
+  } catch (e) {
+    console.log(`⚠️  SAMM quote failed: ${e.message?.slice(0, 80)}`);
+    return null;
+  }
+}
+
+// Sepolia token address map (for Uniswap Trading API comparison)
+const SEPOLIA_TOKEN_MAP = {
+  'WETH': '0x0000000000000000000000000000000000000000',
+  'USDC': '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+  'USDT': '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06',
+  'DAI':  '0x68194a729C2450ad26072b3D33ADaCbcef39D574',
+  'LINK': '0x779877A7B0D9E8603169DdbD7836e478b4624789',
+};
+
+// Helper: get a Sepolia Uniswap Trading API quote (EXACT_OUTPUT)
+async function getSepoliaUniswapQuote(tokenIn, tokenOut, amountOut) {
+  if (!uniswapSepolia || !uniswapSepolia.apiKey) return null;
+  const sepoliaIn = SEPOLIA_TOKEN_MAP[tokenIn];
+  const sepoliaOut = SEPOLIA_TOKEN_MAP[tokenOut];
+  if (!sepoliaIn || !sepoliaOut) return null;
+  const tIn = tokens[tokenIn], tOut = tokens[tokenOut];
+  if (!tIn || !tOut) return null;
+  try {
+    const amtWei = ethers.parseUnits(amountOut.toString(), tOut.decimals);
+    const apiData = await uniswapSepolia.getAPIQuote(
+      sepoliaIn, sepoliaOut, amtWei.toString(), 'EXACT_OUTPUT', 5.0
+    );
+    const rawAmountIn = apiData.quote?.amountIn || apiData.quote?.input?.amount || '0';
+    const amtIn = parseFloat(ethers.formatUnits(BigInt(rawAmountIn), tIn.decimals));
+    return {
+      amountIn: amtIn.toFixed(8),
+      amountOut: amountOut.toString(),
+      routing: apiData.routing,
+      effectiveRate: amtIn > 0 ? (parseFloat(amountOut) / amtIn).toFixed(8) : '0',
+      source: `Uniswap Trading API (Sepolia testnet)`,
+      network: 'sepolia',
+      chainId: 11155111,
+      apiUsed: true,
+    };
+  } catch (e) {
+    return { error: e.message, source: 'Uniswap Trading API (Sepolia)', apiUsed: true };
+  }
+}
+
+// GET /compare/:tokenIn/:tokenOut/:amountOut — SAMM vs Uniswap comparison
+app.get('/compare/:tokenIn/:tokenOut/:amountOut', async (req, res) => {
+  try {
+    const { tokenIn, tokenOut, amountOut } = req.params;
+    if (!tokens[tokenIn] || !tokens[tokenOut])
+      return res.status(400).json({ error: 'Invalid token', tokens: Object.keys(tokens) });
+    await refreshOracle();
+
+    const sammQuote = await getSAMMQuoteForComparison(tokenIn, tokenOut, amountOut);
+    if (!sammQuote) return res.status(500).json({ error: 'SAMM quote failed' });
+
+    // Get Sepolia Uniswap API quote (same testnet tier — real comparison)
+    const sepoliaQuote = await getSepoliaUniswapQuote(tokenIn, tokenOut, amountOut);
+
+    // Also get mainnet Uniswap quote for reference
+    let mainnetComparison = null;
+    try {
+      mainnetComparison = await uniswapQuoter.compareWithSAMM(
+        sammQuote, tokenIn, tokenOut, amountOut, oraclePrices
+      );
+    } catch { /* mainnet quote optional */ }
+
+    // Build primary comparison: SAMM vs Sepolia Uniswap
+    const sammIn = parseFloat(sammQuote.amountIn);
+    let sepoliaComparison = null;
+    if (sepoliaQuote && !sepoliaQuote.error) {
+      const uniIn = parseFloat(sepoliaQuote.amountIn);
+      if (uniIn > 0 && sammIn > 0) {
+        const deltaPercent = ((uniIn - sammIn) / uniIn) * 100;
+        const winner = sammIn < uniIn ? 'SAMM' : sammIn > uniIn ? 'Uniswap (Sepolia)' : 'Tie';
+        const priceIn = oraclePrices[tokenIn] || 1;
+        sepoliaComparison = {
+          winner,
+          deltaPercent: deltaPercent.toFixed(4),
+          sammRequiresLessInput: sammIn < uniIn,
+          savingsUSD: (Math.abs(uniIn - sammIn) * priceIn).toFixed(4),
+          recommendation: winner === 'SAMM'
+            ? `Route via SAMM shard ${sammQuote.shard} — saves ${deltaPercent.toFixed(2)}%`
+            : `Route via Uniswap Sepolia (${sepoliaQuote.routing}) — saves ${Math.abs(deltaPercent).toFixed(2)}%`,
+        };
+      }
+    }
+
+    res.json({
+      tokenIn, tokenOut, amountOut,
+      amountOutUSD: (parseFloat(amountOut) * (oraclePrices[tokenOut] || 1)).toFixed(2),
+      samm: {
+        ...sammQuote,
+        source: 'SAMM (RiseChain testnet)',
+        network: 'risechain',
+        chainId: 11155931,
+      },
+      sepoliaUniswap: sepoliaQuote,
+      comparison: sepoliaComparison,
+      mainnetUniswap: mainnetComparison?.uniswap || null,
+      mainnetComparison: mainnetComparison?.comparison || null,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /compare/matrix — Full comparison matrix across all pairs and trade sizes
+app.get('/compare/matrix', async (req, res) => {
+  try {
+    await refreshOracle();
+    const matrix = await uniswapQuoter.runComparisonMatrix(
+      (tokenIn, tokenOut, amountOut) => getSAMMQuoteForComparison(tokenIn, tokenOut, amountOut),
+      oraclePrices
+    );
+    res.json(matrix);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Chainlink Oracle ───────────────────────────────────────────
+
+// GET /oracle/chainlink — Chainlink vs CoinGecko vs on-chain spot prices
+app.get('/oracle/chainlink', async (req, res) => {
+  try {
+    await refreshOracle();
+    const chainlinkData = await chainlinkOracle.fetchAllPrices();
+    const comparison = chainlinkOracle.compareWith(oraclePrices, 'CoinGecko');
+
+    // Also get on-chain spot prices from SAMM pools for a 3-way comparison
+    const spotPrices = {};
+    for (const [pair, shards] of Object.entries(deployment.contracts.shards)) {
+      const [tokenA, tokenB] = pair.split('-');
+      const tA = tokens[tokenA], tB = tokens[tokenB];
+      if (!tA || !tB) continue;
+      try {
+        const pool = new ethers.Contract(shards[shards.length - 1].address, POOL_ABI, provider);
+        const oneUnit = ethers.parseUnits('1', tB.decimals);
+        const q = await pool.calculateSwapSAMM(oneUnit, tA.address, tB.address);
+        spotPrices[pair] = {
+          price: parseFloat(ethers.formatUnits(q.amountIn, tA.decimals)),
+          pool: shards[shards.length - 1].name,
+        };
+      } catch { /* skip */ }
+    }
+
+    res.json({
+      chainlink: chainlinkData,
+      coingecko: oraclePrices,
+      comparison,
+      spotPrices,
+      summary: {
+        chainlinkEnabled: chainlinkOracle.enabled,
+        feedCount: chainlinkData.feedCount || 0,
+        source: chainlinkData.source,
+        description: 'Chainlink provides decentralized, DON-validated price feeds. '
+          + 'CoinGecko is a centralized API fallback. SAMM spot prices are derived from on-chain reserves.',
+      },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /oracle/status — Oracle system status
+app.get('/oracle/status', (req, res) => {
+  res.json({
+    chainlink: chainlinkOracle.getStatus(),
+    coingecko: { prices: oraclePrices, lastUpdate: lastOracleUpdate },
+    primary: chainlinkOracle.enabled ? 'chainlink' : 'coingecko',
+    arbBotSource: arbitrageBot?.oracleSource || 'not started',
+  });
+});
+
+// ─── ENS Agent Registry ─────────────────────────────────────────
+
+app.get('/agents', async (req, res) => {
+  if (!ensRegistry) return res.json({ enabled: false, agents: [] });
+  try {
+    const agents = await ensRegistry.listAgents();
+    res.json({
+      enabled: true,
+      status: ensRegistry.status(),
+      agents,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/agents/:name', async (req, res) => {
+  if (!ensRegistry) return res.status(404).json({ enabled: false, error: 'ENS registry disabled' });
+  try {
+    const { name } = req.params;
+    const agent = await ensRegistry.getAgent(name);
+    if (!agent) return res.status(404).json({ error: `Agent not found: ${name}` });
+
+    const resolvedAddress = agent.ensName ? await ensRegistry.resolveAddress(agent.ensName) : null;
+    res.json({
+      agent,
+      ensResolution: agent.ensName ? {
+        name: agent.ensName,
+        resolvedAddress,
+        matchesRegistryAddress: resolvedAddress
+          ? resolvedAddress.toLowerCase() === agent.agentAddress.toLowerCase()
+          : false,
+      } : null,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/registry/shards', async (req, res) => {
+  if (!ensRegistry) return res.json({ enabled: false, shards: [] });
+  try {
+    const shards = await ensRegistry.listShards();
+    res.json({ enabled: true, count: shards.length, shards });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -580,6 +972,520 @@ app.post('/sharding/check', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── Uniswap Sepolia Swap ──────────────────────────────────────
+app.get('/swap/sepolia/quote', async (req, res) => {
+  if (!uniswapSepolia) return res.status(400).json({ error: 'No PRIVATE_KEY or SEPOLIA_RPC_URL' });
+  try {
+    const { tokenIn, tokenOut, amount } = req.query;
+    const WETH = UniswapSepoliaSwap.ADDRESSES.WETH9;
+    const tIn = tokenIn || WETH;
+    const tOut = tokenOut || UniswapSepoliaSwap.ADDRESSES.USDC;
+    const amtWei = ethers.parseEther(amount || '0.001');
+    const quote = await uniswapSepolia.getSwapQuote(tIn, tOut, amtWei);
+    res.json({ source: 'uniswap-v2-sepolia', network: 'sepolia', ...quote });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/swap/sepolia', async (req, res) => {
+  if (!uniswapSepolia) return res.status(400).json({ error: 'No PRIVATE_KEY' });
+  if (!uniswapSepolia.apiKey) return res.status(400).json({ error: 'No UNISWAP_API_KEY — Trading API required' });
+  try {
+    const { tokenIn, tokenOut, amount, type, slippageTolerance } = req.body;
+    if (!tokenIn || !tokenOut || !amount)
+      return res.status(400).json({
+        error: 'Missing: tokenIn, tokenOut, amount',
+        hint: 'Use symbol names (ETH, USDC, USDT, DAI, LINK) or raw Sepolia addresses',
+        example: { tokenIn: 'ETH', tokenOut: 'USDC', amount: '0.001', type: 'EXACT_INPUT', slippageTolerance: 5.0 },
+      });
+
+    // Resolve token symbols → Sepolia addresses
+    const SYMBOL_MAP = {
+      'ETH':  UniswapSepoliaSwap.ADDRESSES.NATIVE_ETH,
+      'WETH': UniswapSepoliaSwap.ADDRESSES.WETH9,
+      'USDC': UniswapSepoliaSwap.ADDRESSES.USDC,
+      'USDT': UniswapSepoliaSwap.ADDRESSES.USDT,
+      'DAI':  UniswapSepoliaSwap.ADDRESSES.DAI,
+      'LINK': UniswapSepoliaSwap.ADDRESSES.LINK,
+    };
+    const DECIMALS = { ETH: 18, WETH: 18, USDC: 6, USDT: 6, DAI: 18, LINK: 18 };
+
+    const resolvedIn  = SYMBOL_MAP[tokenIn.toUpperCase()]  || tokenIn;
+    const resolvedOut = SYMBOL_MAP[tokenOut.toUpperCase()] || tokenOut;
+    const symbolIn = Object.entries(SYMBOL_MAP).find(([,v]) => v.toLowerCase() === resolvedIn.toLowerCase())?.[0] || tokenIn;
+    const decimalsIn = DECIMALS[symbolIn.toUpperCase()] || 18;
+
+    // Parse amount based on type
+    const swapType = (type || 'EXACT_INPUT').toUpperCase();
+    const amountWei = ethers.parseUnits(amount.toString(), decimalsIn).toString();
+    const slip = parseFloat(slippageTolerance || '5.0');
+
+    // If tokenIn is NOT native ETH, ensure Permit2 approval first
+    const isNativeETH = resolvedIn === UniswapSepoliaSwap.ADDRESSES.NATIVE_ETH;
+    if (!isNativeETH) {
+      await uniswapSepolia._ensurePermit2Approval(resolvedIn, BigInt(amountWei));
+    }
+
+    // Full Uniswap Trading API flow:
+    //   1. POST /v1/quote → get routing, permitData, quote
+    //   2. Sign Permit2 EIP-712 typed data (if token swap)
+    //   3. POST /v1/swap → get unsigned tx calldata
+    //   4. Sign + broadcast transaction
+    const result = await uniswapSepolia.executeAPISwap(
+      resolvedIn, resolvedOut, amountWei,
+      { type: swapType, slippageTolerance: slip }
+    );
+
+    res.json({
+      success: true,
+      description: 'Uniswap swap executed via backend — Trading API + Permit2 signed tx',
+      flow: [
+        '1. POST /v1/quote to Uniswap Trading API',
+        isNativeETH ? '2. Native ETH — no Permit2 needed' : '2. Approve token → Permit2 + sign EIP-712',
+        '3. POST /v1/swap for unsigned tx calldata',
+        '4. Backend signs + broadcasts to Sepolia',
+      ],
+      ...result,
+      explorer: `https://sepolia.etherscan.io/tx/${result.txHash}`,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/swap/sepolia/balances', async (req, res) => {
+  if (!uniswapSepolia) return res.status(400).json({ error: 'Not configured' });
+  try {
+    const balances = await uniswapSepolia.getBalances();
+    res.json(balances);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/swap/sepolia/history', (req, res) => {
+  if (!uniswapSepolia) return res.json({ history: [] });
+  res.json({ history: uniswapSepolia.getHistory() });
+});
+
+// ─── Frontend-Compatible Uniswap Swap (user signs in MetaMask) ──────
+
+/**
+ * POST /swap/sepolia/prepare
+ *
+ * Step 1 of the user-facing flow: get a quote + Permit2 data for
+ * the user's OWN wallet. The backend proxies the Uniswap Trading API
+ * but does NOT sign anything — only the user's MetaMask does.
+ *
+ * Body: { userAddress, tokenIn, tokenOut, amount, type?, slippageTolerance? }
+ */
+app.post('/swap/sepolia/prepare', async (req, res) => {
+  if (!uniswapSepolia) return res.status(400).json({ error: 'Uniswap integration not configured' });
+  if (!uniswapSepolia.apiKey) return res.status(400).json({ error: 'No UNISWAP_API_KEY' });
+  try {
+    const { userAddress, tokenIn, tokenOut, amount, type, slippageTolerance } = req.body;
+    if (!userAddress || !tokenIn || !tokenOut || !amount)
+      return res.status(400).json({
+        error: 'Missing: userAddress, tokenIn, tokenOut, amount',
+        hint: 'userAddress = the wallet address the user connected in MetaMask',
+        example: {
+          userAddress: '0xYourMetaMaskAddress',
+          tokenIn: 'ETH',
+          tokenOut: 'USDC',
+          amount: '0.001',
+          type: 'EXACT_INPUT',
+          slippageTolerance: 5.0,
+        },
+      });
+
+    // Resolve token symbols → Sepolia addresses
+    const SYMBOL_MAP = {
+      'ETH':  UniswapSepoliaSwap.ADDRESSES.NATIVE_ETH,
+      'WETH': UniswapSepoliaSwap.ADDRESSES.WETH9,
+      'USDC': UniswapSepoliaSwap.ADDRESSES.USDC,
+      'USDT': UniswapSepoliaSwap.ADDRESSES.USDT,
+      'DAI':  UniswapSepoliaSwap.ADDRESSES.DAI,
+      'LINK': UniswapSepoliaSwap.ADDRESSES.LINK,
+    };
+    const DECIMALS = { ETH: 18, WETH: 18, USDC: 6, USDT: 6, DAI: 18, LINK: 18 };
+
+    const resolvedIn  = SYMBOL_MAP[tokenIn.toUpperCase()]  || tokenIn;
+    const resolvedOut = SYMBOL_MAP[tokenOut.toUpperCase()] || tokenOut;
+    const symbolIn = Object.entries(SYMBOL_MAP).find(([,v]) => v.toLowerCase() === resolvedIn.toLowerCase())?.[0] || tokenIn;
+    const decimalsIn = DECIMALS[symbolIn.toUpperCase()] || 18;
+
+    const swapType = (type || 'EXACT_INPUT').toUpperCase();
+    const amountWei = ethers.parseUnits(amount.toString(), decimalsIn).toString();
+    const slip = parseFloat(slippageTolerance || '5.0');
+
+    const result = await uniswapSepolia.prepareSwapForUser(
+      userAddress, resolvedIn, resolvedOut, amountWei,
+      { type: swapType, slippageTolerance: slip }
+    );
+
+    res.json({
+      ...result,
+      flow: [
+        '1. Frontend calls POST /swap/sepolia/prepare (this endpoint)',
+        '2. Frontend shows quote to user, user approves',
+        result.needsPermit2Signature
+          ? '3. User signs permitData in MetaMask (signTypedData_v4)'
+          : '3. No Permit2 signature needed (native ETH)',
+        '4. Frontend calls POST /swap/sepolia/execute with { quote, signature, permitData, routing }',
+        '5. Backend returns unsigned tx → user signs + broadcasts in MetaMask',
+      ],
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * POST /swap/sepolia/execute
+ *
+ * Step 2 of the user-facing flow: take the user's Permit2 signature
+ * + quote, call Uniswap /v1/swap, return unsigned tx for MetaMask.
+ *
+ * Body: { quote, signature?, permitData?, routing }
+ */
+app.post('/swap/sepolia/execute', async (req, res) => {
+  if (!uniswapSepolia) return res.status(400).json({ error: 'Uniswap integration not configured' });
+  if (!uniswapSepolia.apiKey) return res.status(400).json({ error: 'No UNISWAP_API_KEY' });
+  try {
+    const { quote, signature, permitData, routing } = req.body;
+    if (!quote || !routing)
+      return res.status(400).json({
+        error: 'Missing: quote, routing (from /swap/sepolia/prepare response)',
+        hint: 'Also include signature + permitData if the prepare step returned needsPermit2Signature: true',
+      });
+
+    const result = await uniswapSepolia.getSwapCalldata(
+      quote, signature || null, permitData || null, routing
+    );
+
+    res.json({
+      ...result,
+      nextStep: 'Sign unsignedTransaction in MetaMask and call eth_sendTransaction',
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Bridge: Sepolia ↔ RiseChain ────────────────────────────────
+app.get('/bridge/status', (req, res) => {
+  if (!riseChainBridge) return res.status(400).json({ error: 'Not configured' });
+  res.json(riseChainBridge.getStatus());
+});
+
+app.get('/bridge/balances', async (req, res) => {
+  if (!riseChainBridge) return res.status(400).json({ error: 'Not configured' });
+  try {
+    const balances = await riseChainBridge.getBalances();
+    res.json(balances);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/bridge/deposit', async (req, res) => {
+  if (!riseChainBridge) return res.status(400).json({ error: 'Not configured' });
+  try {
+    const { amount, asset } = req.body;
+    if (!amount) return res.status(400).json({ error: 'amount required' });
+    if (asset && asset !== 'ETH') {
+      return res.status(400).json({ error: 'Only ETH bridge supported in demo' });
+    }
+    const result = await riseChainBridge.depositETH(amount);
+    res.json({ success: true, ...result });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/bridge/withdraw', async (req, res) => {
+  if (!riseChainBridge) return res.status(400).json({ error: 'Not configured' });
+  try {
+    const { amount } = req.body;
+    if (!amount) return res.status(400).json({ error: 'amount required' });
+    const result = await riseChainBridge.withdrawETH(amount);
+    res.json({ success: true, ...result });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/bridge/history', (req, res) => {
+  if (!riseChainBridge) return res.json({ history: [] });
+  res.json({ history: riseChainBridge.getHistory() });
+});
+
+// ─── CRE Workflow Status ────────────────────────────────────────
+app.get('/sharding/cre-status', (req, res) => {
+  const fs = require('fs');
+  const workflowPath = path.join(__dirname, 'integrations', 'chainlink-cre-workflow', 'my-workflow');
+  const hasWorkflow = fs.existsSync(path.join(workflowPath, 'workflow.ts'));
+  const hasConfig = fs.existsSync(path.join(workflowPath, 'config.json'));
+  
+  let config = {};
+  if (hasConfig) {
+    try { config = JSON.parse(fs.readFileSync(path.join(workflowPath, 'config.json'), 'utf8')); } catch(e) {}
+  }
+  
+  res.json({
+    cre: {
+      workflowExists: hasWorkflow,
+      configExists: hasConfig,
+      workflowName: 'samm-shard-orchestrator',
+      trigger: config.schedule || 'not configured',
+      splitThreshold: config.splitTpsThreshold || 250,
+      mergeThreshold: config.mergeTpsThreshold || 62.5,
+      maxShardsPerPair: config.maxShardsPerPair || 10,
+      feeds: config.feeds || [],
+      pairs: config.pairs || [],
+      howToSimulate: 'cre workflow simulate integrations/chainlink-cre-workflow/my-workflow',
+      note: 'CRE workflows run on Chainlink DON — simulate locally with CRE CLI, deploy requires Early Access',
+    },
+    offchainFallback: shardManager ? shardManager.getStatus() : { enabled: false },
+  });
+});
+
+/**
+ * POST /sharding/cre-simulate
+ *
+ * Runs the CRE workflow logic LIVE — reads Chainlink price feeds
+ * from Sepolia on-chain, fetches SAMM pool data from the running
+ * api-server, and computes shard decisions.
+ *
+ * This mirrors what the CRE workflow.ts does on the Chainlink DON,
+ * but executed here so judges can see it working in real-time.
+ */
+app.post('/sharding/cre-simulate', async (req, res) => {
+  try {
+    const startTime = Date.now();
+    const sepoliaRpc = process.env.SEPOLIA_RPC_URL;
+    if (!sepoliaRpc) return res.status(400).json({ error: 'SEPOLIA_RPC_URL not configured' });
+
+    const sepoliaProvider = new ethers.JsonRpcProvider(sepoliaRpc);
+
+    // Chainlink AggregatorV3 ABI
+    const aggABI = [
+      'function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)',
+      'function decimals() view returns (uint8)',
+      'function description() view returns (string)',
+    ];
+
+    // CRE workflow config (same feeds as workflow.ts)
+    const creConfig = {
+      feeds: [
+        { name: 'ETH/USD', address: '0x694AA1769357215DE4FAC081bf1f309aDC325306' },
+        { name: 'BTC/USD', address: '0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43' },
+        { name: 'USDC/USD', address: '0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E' },
+        { name: 'DAI/USD', address: '0x14866185B1962B63C3Ea9E03Bc1da838bab34C19' },
+      ],
+      pairs: [
+        { tokenA: 'WETH', tokenB: 'USDC' },
+        { tokenA: 'USDC', tokenB: 'USDT' },
+        { tokenA: 'WETH', tokenB: 'USDT' },
+        { tokenA: 'WBTC', tokenB: 'USDC' },
+        { tokenA: 'USDC', tokenB: 'DAI' },
+      ],
+      splitTpsThreshold: 250,
+      mergeTpsThreshold: 62.5,
+      maxShardsPerPair: 10,
+      minDeviationPct: 0.30,
+    };
+
+    // ── Step 1: Read Chainlink price feeds from Sepolia ──
+    const prices = [];
+    const feedErrors = [];
+    await Promise.all(creConfig.feeds.map(async (feed) => {
+      try {
+        const contract = new ethers.Contract(feed.address, aggABI, sepoliaProvider);
+        const [roundId, answer, , updatedAt] = await contract.latestRoundData();
+        const decimals = await contract.decimals();
+        const description = await contract.description().catch(() => feed.name);
+        const price = parseFloat(ethers.formatUnits(answer, decimals));
+        const staleness = Math.floor(Date.now() / 1000) - Number(updatedAt);
+        prices.push({
+          name: feed.name,
+          price,
+          roundId: roundId.toString(),
+          decimals: Number(decimals),
+          updatedAt: new Date(Number(updatedAt) * 1000).toISOString(),
+          stalenessSeconds: staleness,
+          feedAddress: feed.address,
+          description,
+          source: 'Chainlink AggregatorV3 on Sepolia (LIVE on-chain read)',
+        });
+      } catch (err) {
+        feedErrors.push({ feed: feed.name, address: feed.address, error: err.message?.slice(0, 100) });
+      }
+    }));
+
+    // ── Step 2: Get SAMM pool data from self ──
+    // The 3 original shards (Small/Medium/Large) are NEVER removed.
+    // Only Dynamic shards (suffixed -Dynamic) can be created/merged/split.
+    const MIN_SHARDS_PER_PAIR = 3;
+    let sammData = { pairs: {} };
+    for (const [pair, shards] of Object.entries(deployment.contracts?.shards || {})) {
+      const originalShards = shards.filter(s => !s.name.includes('Dynamic'));
+      const dynamicShards = shards.filter(s => s.name.includes('Dynamic'));
+      sammData.pairs[pair] = {
+        shardCount: shards.length,
+        originalShards: originalShards.length,
+        dynamicShards: dynamicShards.length,
+        originalNames: originalShards.map(s => s.name),
+        dynamicNames: dynamicShards.map(s => s.name),
+        tps: shardManager?.pairMetrics?.[pair]?.tps || 0,
+        totalTVL: 0,
+        shards: [],
+      };
+    }
+
+    // ── Step 3: Compute shard decisions (same logic as CRE workflow.ts) ──
+    const priceMap = new Map(prices.map(p => [p.name, p.price]));
+    const decisions = [];
+    for (const pair of creConfig.pairs) {
+      const pairKey = `${pair.tokenA}-${pair.tokenB}`;
+      const pairData = sammData.pairs[pairKey];
+      if (!pairData) continue;
+
+      const { shardCount, tps } = pairData;
+      const tpsPerShard = shardCount > 0 ? tps / shardCount : 0;
+
+      if (tpsPerShard >= creConfig.splitTpsThreshold) {
+        const targetShards = Math.min(
+          Math.ceil(tps / creConfig.splitTpsThreshold),
+          creConfig.maxShardsPerPair
+        );
+        decisions.push({
+          type: 'SPLIT',
+          pair: pairKey,
+          reason: `TPS/shard ${tpsPerShard.toFixed(1)} ≥ ${creConfig.splitTpsThreshold} threshold`,
+          currentShards: shardCount,
+          targetShards,
+          tps,
+        });
+      } else if (tpsPerShard <= creConfig.mergeTpsThreshold && shardCount > MIN_SHARDS_PER_PAIR) {
+        // Only merge DYNAMIC shards — the 3 original shards (Small/Medium/Large) are protected
+        const targetShards = Math.max(Math.ceil(tps / creConfig.splitTpsThreshold), MIN_SHARDS_PER_PAIR);
+        const dynamicCount = pairData.dynamicShards || 0;
+        const dynamicToRemove = shardCount - targetShards;
+        decisions.push({
+          type: 'MERGE',
+          pair: pairKey,
+          reason: `TPS/shard ${tpsPerShard.toFixed(1)} ≤ ${creConfig.mergeTpsThreshold} — remove ${Math.min(dynamicToRemove, dynamicCount)} dynamic shard(s)`,
+          currentShards: shardCount,
+          targetShards,
+          originalShardsProtected: pairData.originalShards || MIN_SHARDS_PER_PAIR,
+          dynamicShardsToRemove: Math.min(dynamicToRemove, dynamicCount),
+          note: `Original shards (${(pairData.originalNames || []).join(', ')}) are NEVER removed`,
+          tps,
+        });
+      } else {
+        decisions.push({
+          type: 'NO_ACTION',
+          pair: pairKey,
+          reason: `TPS/shard ${tpsPerShard.toFixed(1)} within bounds [${creConfig.mergeTpsThreshold}, ${creConfig.splitTpsThreshold}]`,
+          currentShards: shardCount,
+          targetShards: shardCount,
+          tps,
+        });
+      }
+
+      // Price deviation check
+      const priceA = priceMap.get(`${pair.tokenA === 'WETH' ? 'ETH' : pair.tokenA === 'WBTC' ? 'BTC' : pair.tokenA}/USD`);
+      const priceB = priceMap.get(`${pair.tokenB === 'WETH' ? 'ETH' : pair.tokenB === 'WBTC' ? 'BTC' : pair.tokenB}/USD`);
+      if (priceA && priceB) {
+        const oracleRate = priceA / priceB;
+        decisions.push({
+          type: 'PRICE_CHECK',
+          pair: pairKey,
+          oracleRate: oracleRate.toFixed(6),
+          priceA: `${pair.tokenA}: $${priceA.toFixed(2)}`,
+          priceB: `${pair.tokenB}: $${priceB.toFixed(2)}`,
+          source: 'Chainlink Sepolia',
+        });
+      }
+    }
+
+    const elapsed = Date.now() - startTime;
+
+    res.json({
+      success: true,
+      workflow: 'samm-shard-orchestrator (CRE simulation)',
+      timestamp: new Date().toISOString(),
+      executionTimeMs: elapsed,
+      chainlinkPrices: prices,
+      feedErrors: feedErrors.length > 0 ? feedErrors : undefined,
+      sammPoolData: sammData,
+      decisions,
+      summary: {
+        totalDecisions: decisions.length,
+        splits: decisions.filter(d => d.type === 'SPLIT').length,
+        merges: decisions.filter(d => d.type === 'MERGE').length,
+        noAction: decisions.filter(d => d.type === 'NO_ACTION').length,
+        priceChecks: decisions.filter(d => d.type === 'PRICE_CHECK').length,
+        pricesSummary: prices.map(p => `${p.name}=$${p.price.toFixed(2)}`).join(', '),
+      },
+      architecture: {
+        description: 'CRE workflow reads Chainlink price feeds on-chain via EVMClient.callContract, '
+          + 'fetches SAMM pool data via HTTP, computes shard decisions using TPS thresholds and price deviations. '
+          + 'On Chainlink DON, this runs every 60s via cron trigger with DON consensus.',
+        chainlinkFeeds: creConfig.feeds.map(f => f.name),
+        thresholds: {
+          split: `${creConfig.splitTpsThreshold} TPS/shard`,
+          merge: `${creConfig.mergeTpsThreshold} TPS/shard`,
+          minDeviation: `${creConfig.minDeviationPct}%`,
+        },
+        trigger: 'CronCapability — every 60 seconds',
+        consensus: 'ConsensusAggregationByFields (DON nodes agree on shard decisions)',
+      },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Integration Status ─────────────────────────────────────────
+app.get('/integrations', async (req, res) => {
+  const status = {
+    uniswap: {
+      apiQuoter: {
+        enabled: !!uniswapQuoter,
+        source: 'uniswap-trading-api',
+        apiKeyConfigured: !!process.env.UNISWAP_API_KEY,
+        apiEndpoint: 'https://trade-api.gateway.uniswap.org/v1',
+      },
+      sepoliaSwap: {
+        enabled: !!uniswapSepolia,
+        tradingAPIEnabled: !!(uniswapSepolia && uniswapSepolia.apiKey),
+        router: UniswapSepoliaSwap.ADDRESSES.UNIVERSAL_ROUTER,
+        v2Factory: UniswapSepoliaSwap.ADDRESSES.V2_FACTORY,
+        permit2: UniswapSepoliaSwap.ADDRESSES.PERMIT2,
+        network: 'sepolia',
+        chainId: 11155111,
+        history: uniswapSepolia ? uniswapSepolia.getHistory().length : 0,
+      },
+    },
+    chainlink: {
+      priceFeeds: {
+        enabled: chainlinkOracle.enabled,
+        network: 'sepolia',
+        feeds: ['ETH/USD', 'BTC/USD', 'USDC/USD', 'DAI/USD', 'LINK/USD'],
+      },
+      creWorkflow: {
+        enabled: true,
+        name: 'samm-shard-orchestrator',
+        description: 'Decentralized shard management via Chainlink DON',
+        splitThreshold: '250 TPS',
+        mergeThreshold: '62.5 TPS',
+      },
+    },
+    ens: {
+      resolution: { enabled: !!ensProvider, source: 'ethereum-mainnet' },
+      agentRegistry: {
+        enabled: !!ensRegistry,
+        onChain: !!process.env.ENS_REGISTRY_ADDRESS,
+        baseDomain: 'samm.eth',
+      },
+    },
+    bridge: {
+      enabled: !!riseChainBridge,
+      type: 'OP Stack Canonical Bridge',
+      l1: 'Sepolia',
+      l2: 'RiseChain Testnet',
+      contracts: riseChainBridge ? RiseChainBridge.ADDRESSES : null,
+      history: riseChainBridge ? riseChainBridge.getHistory().length : 0,
+    },
+  };
+  res.json(status);
+});
+
 // ── Error handler ──
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -603,11 +1509,36 @@ initialize().then(() => {
     console.log(`   GET  /balance/:addr/:token            — token balance`);
     console.log(`   GET  /balances/:addr                  — all balances`);
     console.log(`   GET  /stats                           — DEX statistics`);
+    console.log(`   GET  /compare/:in/:out/:amt           — SAMM vs Uniswap comparison`);
+    console.log(`   GET  /compare/matrix                  — full comparison matrix`);
+    console.log(`   GET  /oracle/chainlink                 — Chainlink vs CoinGecko prices`);
+    console.log(`   GET  /oracle/status                    — oracle system status`);
+    console.log(`   GET  /agents                          — ENS-discoverable SAMM agents`);
+    console.log(`   GET  /agents/:name                    — agent identity + metadata`);
+    console.log(`   GET  /registry/shards                 — ENS shard registry view`);
     console.log(`   GET  /arbitrage/status                — arb bot status`);
     console.log(`   GET  /arbitrage/history?limit=50      — arb swap log`);
     console.log(`   POST /arbitrage/start|stop            — control arb bot`);
     console.log(`   GET  /sharding/status                 — shard manager status`);
     console.log(`   POST /sharding/start|stop|check       — control shard manager`);
+    console.log(`   ── Uniswap Sepolia (NEW) ──`);
+    console.log(`   GET  /swap/sepolia/quote              — Uniswap V2 quote on Sepolia`);
+    console.log(`   POST /swap/sepolia                    — execute real Uniswap swap (backend signs)`);
+    console.log(`   POST /swap/sepolia/prepare            — get quote for user's MetaMask wallet`);
+    console.log(`   POST /swap/sepolia/execute            — get unsigned tx (user signs in MetaMask)`);
+    console.log(`   GET  /swap/sepolia/balances           — Sepolia wallet balances`);
+    console.log(`   GET  /swap/sepolia/history            — Sepolia swap history`);
+    console.log(`   ── Bridge (NEW) ──`);
+    console.log(`   GET  /bridge/status                   — bridge status + contracts`);
+    console.log(`   GET  /bridge/balances                 — cross-chain balances`);
+    console.log(`   POST /bridge/deposit                  — bridge ETH L1→L2`);
+    console.log(`   POST /bridge/withdraw                 — bridge ETH L2→L1`);
+    console.log(`   GET  /bridge/history                  — bridge tx history`);
+    console.log(`   ── CRE Workflow ──`);
+    console.log(`   GET  /sharding/cre-status             — CRE workflow status`);
+    console.log(`   POST /sharding/cre-simulate           — run CRE workflow LIVE (Chainlink feeds + decisions)`);
+    console.log(`   ── Integrations ──`);
+    console.log(`   GET  /integrations                    — integration statuses`);
     console.log(`\n💡 curl http://localhost:${PORT}/health\n`);
   });
 }).catch(err => { console.error('Failed:', err); process.exit(1); });

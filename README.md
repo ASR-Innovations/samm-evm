@@ -44,21 +44,26 @@ $$
                     ▼            ▼                ▼
           arbitrage-bot.js  dynamic-shard-     tx-queue.js
           (rebalancer)      manager.js         (nonce serialiser)
-                    │        (TPS scaler)          │
+                │            (TPS scaler)          │
+                │                │                 │
+     ┌──────────┴───┐    ┌──────┴───────┐         │
+     │ Chainlink    │    │ CRE Workflow │         │
+     │ AggregatorV3 │    │ (workflow.ts)│         │
+     │ (Sepolia)    │    │  Chainlink   │         │
+     └──────────────┘    │  DON sim    │         │
+                         └──────────────┘         │
                     └────────────┼────────────────┘
                                  ▼
-                    ┌────────────────────────┐
-                    │   RiseChain Testnet     │
-                    │   (Solidity contracts)  │
-                    └────────────────────────┘
-                                 │
-          ┌──────────────────────┼──────────────────────┐
-          ▼                      ▼                      ▼
-   CrossPoolRouter        SAMMPoolFactory        DynamicShardOrchestrator
-          │                      │
-          ▼                      ▼
-    SAMMPool shards        SAMMCurve / SAMMFees
-    (20 live pools)        (math libraries)
+          ┌──────────────────────────────────────────┐
+          │   RiseChain Testnet (Solidity contracts)  │
+          └──────────────────────────────────────────┘
+          │              │              │              │
+          ▼              ▼              ▼              ▼
+   CrossPoolRouter  SAMMPool-    SAMMAgent-     Uniswap
+                    Factory      Registry      Trading API
+                         │                     (Sepolia)
+                         ▼
+                   SAMMPool shards (22 live pools)
 ```
 
 ### On-Chain Contracts
@@ -136,7 +141,7 @@ Since this repo is public:
 | WBTC | `0xD35648Ad048e450aFd22f3421cE6A5EFFC40DC4D` | 8 |
 | DAI | `0x51A046A489da585eB5875845FdC7323c0f1F0606` | 18 |
 
-### Liquidity Shards — 20 pools, ~$32.8M TVL
+### Liquidity Shards — 22 pools, ~$42.7M TVL
 
 | Pair | Shards | Combined TVL |
 |------|--------|-------------|
@@ -232,6 +237,13 @@ Base URL: `http://localhost:3000`
 | `GET` | `/arbitrage/status` | Arb bot running status |
 | `GET` | `/arbitrage/history` | Recent arb swap log |
 | `GET` | `/sharding/status` | Shard manager status + TPS readings |
+| `GET` | `/compare/:in/:out/:amt` | SAMM vs Uniswap rate comparison |
+| `GET` | `/compare/matrix` | Full comparison matrix (all pairs × trade sizes) |
+| `GET` | `/oracle/chainlink` | Chainlink vs CoinGecko vs spot prices |
+| `GET` | `/oracle/status` | Oracle system status |
+| `GET` | `/agents` | ENS-discoverable SAMM agents |
+| `GET` | `/agents/:name` | Agent identity + text records |
+| `GET` | `/registry/shards` | ENS shard registry |
 
 ### Write Endpoints (require `PRIVATE_KEY`)
 
@@ -243,6 +255,10 @@ Base URL: `http://localhost:3000`
 | `POST` | `/sharding/start` | Start shard manager |
 | `POST` | `/sharding/stop` | Stop shard manager |
 | `POST` | `/sharding/check` | Trigger immediate shard check |
+| `POST` | `/sharding/cre-simulate` | CRE shard decisions with live Chainlink feeds |
+| `POST` | `/swap/sepolia` | Execute Uniswap swap on Sepolia (backend-signed) |
+| `POST` | `/swap/sepolia/prepare` | Get Permit2 signature data for user wallet |
+| `POST` | `/swap/sepolia/execute` | Get unsigned calldata for user wallet |
 
 ### Example Queries
 
@@ -277,6 +293,9 @@ Set these environment variables in Railway's dashboard:
 | `PORT` | No | Defaults to 3000 |
 | `ENABLE_ARBITRAGE` | No | `true` to auto-start arb bot |
 | `ENABLE_DYNAMIC_SHARDING` | No | `true` to auto-start shard manager |
+| `UNISWAP_API_KEY` | No | Uniswap Trading API key (enables /compare) |
+| `SEPOLIA_RPC_URL` | No | Sepolia RPC for Chainlink feeds |
+| `ENS_REGISTRY_ADDRESS` | No | Deployed SAMMAgentRegistry address |
 
 ---
 
@@ -289,11 +308,27 @@ samm-evm/
 │   ├── SAMMPoolFactory.sol                #   Factory for creating shards
 │   ├── CrossPoolRouter.sol                #   Multi-hop swap router
 │   ├── DynamicShardOrchestrator.sol       #   On-chain shard creator
+│   ├── SAMMAgentRegistry.sol              #   ENS agent identity registry
 │   ├── TokenFaucet.sol                    #   Testnet faucet
-│   ├── interfaces/                        #   ISAMMPool, ISAMMPoolFactory, ICrossPoolRouter
+│   ├── interfaces/                        #   ISAMMPool, ISAMMPoolFactory, ICrossPoolRouter, IChainlinkAggregator
 │   └── libraries/                         #   SAMMCurve.sol, SAMMFees.sol
+├── integrations/                          # External protocol integrations
+│   ├── uniswap-client.js                 #   Uniswap comparison wrapper
+│   ├── uniswap-sepolia-swap.js           #   Uniswap Trading API (swap execution)
+│   ├── chainlink-price.js                #   Chainlink AggregatorV3 oracle reader
+│   ├── ens-agent-registry.js             #   ENS agent identity manager
+│   ├── risechain-bridge.js               #   OP Stack canonical bridge
+│   └── chainlink-cre-workflow/           #   CRE SDK workflow spec
+│       ├── my-workflow/
+│       │   ├── workflow.ts               #     CRE workflow (396 lines)
+│       │   ├── main.ts                   #     Entry point
+│       │   ├── config.json               #     Feed addresses, thresholds
+│       │   └── workflow.yaml             #     CRE project config
+│       ├── project.yaml                  #     RPC configuration
+│       ├── package.json                  #     CRE SDK dependencies
+│       └── README.md                     #     Setup instructions
 ├── api-server.js                          # REST API server (Express)
-├── arbitrage-bot.js                       # Oracle-deviation rebalancer
+├── arbitrage-bot.js                       # Oracle-deviation rebalancer (Chainlink-first)
 ├── dynamic-shard-manager.js               # TPS-driven shard scaler
 ├── tx-queue.js                            # Nonce-safe tx serialiser
 ├── hardhat.config.js                      # Hardhat configuration
@@ -327,6 +362,128 @@ samm-evm/
 
 ---
 
+## Integrations
+
+SAMM extends the core protocol with three purpose-built integrations.
+
+### 🦄 Uniswap — Trading API Integration
+
+SAMM uses the **Uniswap Trading API** (`trade-api.gateway.uniswap.org/v1`) to:
+1. **Quote comparison** — every SAMM quote is compared against a live Uniswap quote for the same trade
+2. **Real swap execution** — `POST /swap/sepolia` calls `/v1/quote` + `/v1/order` to execute on-chain swaps on Sepolia via Universal Router + Permit2
+3. **Frontend-compatible flow** — `POST /swap/sepolia/prepare` returns Permit2 data for MetaMask; `POST /swap/sepolia/execute` returns unsigned calldata
+
+**On-chain proof (Sepolia testnet):**
+
+| Tx Hash | Action |
+|---------|--------|
+| [`0xb451e4da...`](https://sepolia.etherscan.io/tx/0xb451e4da) | Uniswap swap via Trading API (ETH → USDC) |
+| [`0x8c92f0c5...`](https://sepolia.etherscan.io/tx/0x8c92f0c5) | Permit2 approval |
+| [`0xeb9c1ad6...`](https://sepolia.etherscan.io/tx/0xeb9c1ad6) | Forced Uniswap swap test |
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /compare/:in/:out/:amt` | SAMM vs Uniswap quote comparison |
+| `GET /compare/matrix` | Full comparison across all pairs × trade sizes |
+| `POST /swap/sepolia` | Execute Uniswap swap (backend-signed) |
+| `POST /swap/sepolia/prepare` | Step 1: Get Permit2 signature data for MetaMask |
+| `POST /swap/sepolia/execute` | Step 2: Get unsigned calldata for user wallet |
+
+**Module:** `integrations/uniswap-sepolia-swap.js` — full Trading API integration with Permit2, Universal Router, symbol resolution, and frontend-compatible flow.
+
+### 🔗 Chainlink — CRE Workflow + Decentralized Oracle
+
+**CRE Workflow:** The shard management logic is implemented as a Chainlink CRE workflow (`integrations/chainlink-cre-workflow/my-workflow/workflow.ts`) that runs on a Chainlink DON. Every 60 seconds it:
+
+1. **Reads Chainlink price feeds** on Sepolia (ETH/USD, BTC/USD, USDC/USD, DAI/USD) using `EVMClient.callContract`
+2. **Fetches SAMM pool data** via HTTP (reserves, TPS, shard counts)
+3. **Computes shard decisions** — split at 250 TPS, merge at 62.5 TPS, always protect 3 original shards
+4. **Detects arbitrage** from Chainlink vs spot price deviation
+
+**CRE CLI Simulation (verified ✅):**
+```bash
+cd integrations/chainlink-cre-workflow
+cre workflow simulate my-workflow --non-interactive --trigger-index 0
+```
+
+Output:
+```
+✓ Workflow compiled
+📊 Price feed | ETH/USD = $2050.38
+📊 Price feed | BTC/USD = $66851.68
+📊 Price feed | USDC/USD = $1.00
+📊 Price feed | DAI/USD = $1.00
+✅ Fetched SAMM data: 5 pairs
+🔗 MERGE WETH-USDC: 4 → 3 shards — 3 original shards protected
+🔗 MERGE USDC-USDT: 4 → 3 shards — 3 original shards protected
+🔗 MERGE WETH-USDT: 5 → 3 shards — 3 original shards protected
+🔗 MERGE WBTC-USDC: 5 → 3 shards — 3 original shards protected
+🔗 MERGE USDC-DAI: 4 → 3 shards — 3 original shards protected
+Decisions: 0 splits, 5 merges, 0 rebalances
+✓ Workflow Simulation Result: {...}
+╭──────────────────────────────────────────────────────╮
+│ Simulation complete! Ready to deploy your workflow?  │
+╰──────────────────────────────────────────────────────╯
+```
+
+**Chainlink → On-chain state change:** The arb bot (`arbitrage-bot.js`) reads Chainlink AggregatorV3 price feeds on Sepolia in `fetchRealPrices()`. When oracle price deviates >0.3% from any shard's spot price, it executes a corrective `swapSAMM()` transaction on RiseChain — making an **on-chain state change driven by Chainlink data**.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /oracle/chainlink` | Chainlink vs CoinGecko vs spot prices |
+| `POST /sharding/cre-simulate` | Run CRE shard decisions with live Chainlink feeds |
+
+**Modules:**
+- `integrations/chainlink-price.js` — ChainlinkPriceOracle reading 5 feeds from Sepolia AggregatorV3
+- `integrations/chainlink-cre-workflow/` — CRE SDK workflow (396 lines) with `CronCapability`, `EVMClient`, `HTTPClient`, `ConsensusAggregationByFields`
+- `contracts/interfaces/IChainlinkAggregator.sol` — on-chain AggregatorV3Interface
+
+### 🏷️ ENS — AI Agent Identity & Shard Discovery
+
+SAMM has **5 autonomous agents** registered on-chain with ENS-style identities:
+
+| Agent | ENS Name | Address | Role |
+|-------|----------|---------|------|
+| Pool Router | `pool-router.samm.eth` | `0x6A45...3d00` | Trade routing |
+| Arb Bot | `arb-bot.samm.eth` | `0x0045...A589` | Price rebalancing |
+| Shard Manager | `shard-manager.samm.eth` | `0x0045...A589` | Dynamic sharding |
+| Token Faucet | `faucet.samm.eth` | `0x42a9...dBE4` | Token distribution |
+| Pool Factory | `factory.samm.eth` | `0xc4c6...fb94` | Pool creation |
+
+**On-chain registry:** `SAMMAgentRegistry` at `0xCa46f85973d0f13377744fBE8D26ABBdc93a241B` on RiseChain.
+
+**ENS solves 4 real problems:**
+
+1. **Agent Discovery** — resolve `arb-bot.samm.eth` → wallet address (no deployment logs needed)
+2. **Agent Transparency** — text records expose live config (`com.samm.min-deviation`, `com.samm.total-swaps`, `com.samm.oracle-source`) as verifiable on-chain reputation
+3. **Shard Registry** — 42 shards registered with subnames: `small.weth-usdc.samm.eth` → contract address
+4. **Human-readable API** — `GET /balance/vitalik.eth/WETH` works alongside raw addresses
+
+**No hard-coded values:** Agents and shards are registered on-chain via `registerOrUpdateAgent()` and `registerOrUpdateShard()` — the API reads from the on-chain registry dynamically. Agent stats (swap count, cycle count, volume) are updated on-chain in real-time via `setBatchAgentTextRecords()`.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /agents` | List all ENS-discoverable agents (reads from on-chain registry) |
+| `GET /agents/:name` | Agent identity + text records + ENS resolution |
+| `GET /registry/shards` | ENS shard registry (42 shards with subnames) |
+
+**Modules:**
+- `contracts/SAMMAgentRegistry.sol` — on-chain registry with batch text record support
+- `integrations/ens-agent-registry.js` — dual-mode (local + on-chain) identity manager with auto-sync
+
+### Environment Variables
+
+| Variable | Integration | Required | Description |
+|----------|-------|----------|-------------|
+| `UNISWAP_API_KEY` | Uniswap | Yes | From developers.uniswap.org |
+| `SEPOLIA_RPC_URL` | Chainlink | No | For reading Chainlink feeds (disabled if absent) |
+| `ENABLE_ENS` | ENS | No | Enable ENS resolution (`true` by default) |
+| `ENS_RPC_URL` | ENS | No | Custom ENS provider RPC (defaults to mainnet) |
+| `ENS_BASE_DOMAIN` | ENS | No | Base domain (default: `samm.eth`) |
+| `ENS_REGISTRY_ADDRESS` | ENS | No | Deployed SAMMAgentRegistry address |
+
+---
+
 ## Key Concepts
 
 ### c-Smaller-Better Property
@@ -345,7 +502,7 @@ Default: 50 TPS per shard, max 10 shards per pair.
 
 ### Arbitrage Bot
 
-Monitors every shard's spot price against CoinGecko oracles. When deviation exceeds 0.3%, it executes a corrective swap sized at 50% of the gap. A 3-cycle cooldown per shard prevents oscillation.
+Monitors every shard's spot price against decentralized Chainlink price feeds (with CoinGecko as fallback). When deviation exceeds 0.3%, it executes a corrective swap sized at 50% of the gap. A 3-cycle cooldown per shard prevents oscillation.
 
 ---
 

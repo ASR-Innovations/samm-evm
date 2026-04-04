@@ -143,6 +143,16 @@
           "createdBy": "DynamicShardManager",
           "createdAt": "2026-03-29T20:42:37.847Z",
           "managedByOrchestrator": true
+        },
+        {
+          "address": "0x388612e0630b0bdddcF5c754f263fA34b8472538",
+          "name": "WETH-USDT-Large-Dynamic",
+          "liquidityUSD": 5000000,
+          "amountA": "1219.952568244146505094",
+          "amountB": "2500175.012251",
+          "createdBy": "DynamicShardManager",
+          "createdAt": "2026-04-03T17:46:05.126Z",
+          "managedByOrchestrator": true
         }
       ],
       "WBTC-USDC": [
@@ -178,6 +188,16 @@
           "amountB": "125023.504419",
           "createdBy": "DynamicShardManager",
           "createdAt": "2026-03-29T20:42:43.089Z",
+          "managedByOrchestrator": true
+        },
+        {
+          "address": "0x8f19609C5FeEE1B61bC42987d156816D625638d9",
+          "name": "WBTC-USDC-Large-Dynamic",
+          "liquidityUSD": 5000000,
+          "amountA": "37.38038278",
+          "amountB": "2500000.0",
+          "createdBy": "DynamicShardManager",
+          "createdAt": "2026-04-03T17:46:28.520Z",
           "managedByOrchestrator": true
         }
       ],

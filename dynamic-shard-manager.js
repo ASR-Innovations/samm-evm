@@ -31,6 +31,7 @@ class DynamicShardManager {
     // Shard creation thresholds
     this.UTILIZATION_THRESHOLD = parseFloat(process.env.UTILIZATION_THRESHOLD || '0.7'); // 70% of c-threshold used → create new shard
     this.MIN_LIQUIDITY_USD = parseFloat(process.env.MIN_SHARD_LIQUIDITY || '10000'); // $10K minimum per new shard
+    this.MIN_SHARDS_PER_PAIR = parseInt(process.env.MIN_SHARDS_PER_PAIR || '3');
     this.MAX_SHARDS_PER_PAIR = parseInt(process.env.MAX_SHARDS_PER_PAIR || '10');
     this.REBALANCE_RATIO_THRESHOLD = parseFloat(process.env.REBALANCE_RATIO_THRESHOLD || '2.5');
     this.MERGE_LIQUIDITY_THRESHOLD = parseFloat(process.env.MERGE_LIQUIDITY_THRESHOLD || '100000');
@@ -215,9 +216,9 @@ class DynamicShardManager {
    * Returns the ideal shard count for the observed throughput.
    */
   getOptimalShardCount(currentTPS) {
-    if (currentTPS < 1) return 1; // near-idle
+    if (currentTPS < 1) return this.MIN_SHARDS_PER_PAIR; // preserve minimum shards even when idle
     return Math.min(
-      Math.max(1, Math.ceil(currentTPS / this.PER_SHARD_TPS)),
+      Math.max(this.MIN_SHARDS_PER_PAIR, Math.ceil(currentTPS / this.PER_SHARD_TPS)),
       this.MAX_SHARDS_PER_PAIR
     );
   }
@@ -445,6 +446,8 @@ class DynamicShardManager {
    */
   findMergeOpportunity(pair, shardAnalysis) {
     if (shardAnalysis.length < 2) return null;
+    // Never merge below minimum shard count — preserve original 3+ shards
+    if (shardAnalysis.length <= this.MIN_SHARDS_PER_PAIR) return null;
 
     const MERGE_TVL_FLOOR = 10_000; // $10k — shard is effectively dead
 

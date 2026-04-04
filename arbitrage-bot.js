@@ -1,6 +1,7 @@
 const { ethers } = require('ethers');
 const fs = require('fs');
 const path = require('path');
+const { ChainlinkPriceOracle } = require('./integrations/chainlink-price');
 
 class ArbitrageBot {
   constructor(deploymentFile, privateKey, rpcUrl, txQueue) {
@@ -39,6 +40,10 @@ class ArbitrageBot {
       'UNI': 'uniswap', 'AAVE': 'aave'
     };
 
+    // ── Chainlink Oracle (primary, decentralized) ──
+    this.chainlinkOracle = new ChainlinkPriceOracle(process.env.SEPOLIA_RPC_URL);
+    this.oracleSource = 'none'; // tracks which oracle was used last
+
     // Cumulative stats
     this.stats = { cycles: 0, swaps: 0, totalUSD: 0, failures: 0 };
 
@@ -55,13 +60,36 @@ class ArbitrageBot {
     console.log(`   Check interval: ${this.checkInterval}ms`);
   }
 
-  // ── Price feed ──────────────────────────────────────────────
+  // ── Price feed (Chainlink primary, CoinGecko fallback) ──
   async fetchRealPrices() {
     const now = Date.now();
     if (now - this.lastPriceUpdate < this.priceUpdateInterval && Object.keys(this.priceCache).length > 0) {
       return this.priceCache;
     }
 
+    // ── TRY 1: Chainlink (decentralized, on-chain) ──
+    if (this.chainlinkOracle.enabled) {
+      try {
+        const chainlinkPrices = await this.chainlinkOracle.getPriceMap();
+        if (Object.keys(chainlinkPrices).length >= 3) {
+          for (const [symbol, price] of Object.entries(chainlinkPrices)) {
+            this.priceCache[symbol] = price;
+          }
+          this.lastPriceUpdate = now;
+          this.oracleSource = 'chainlink';
+          console.log('✅ Chainlink prices updated (decentralized oracle)');
+          // Still fill any missing tokens from deployment defaults
+          for (const [symbol, data] of Object.entries(this.deployment.contracts.tokens)) {
+            if (!this.priceCache[symbol]) this.priceCache[symbol] = data.price;
+          }
+          return this.priceCache;
+        }
+      } catch (err) {
+        console.log(`⚠️  Chainlink failed, falling back to CoinGecko: ${err.message?.slice(0, 60)}`);
+      }
+    }
+
+    // ── TRY 2: CoinGecko (centralized fallback) ──
     try {
       const ids = Object.values(this.coinGeckoIds).join(',');
       const response = await fetch(
@@ -74,7 +102,8 @@ class ArbitrageBot {
           if (data[geckoId]?.usd) this.priceCache[symbol] = data[geckoId].usd;
         }
         this.lastPriceUpdate = now;
-        console.log('✅ CoinGecko prices updated');
+        this.oracleSource = 'coingecko';
+        console.log('✅ CoinGecko prices updated (centralized fallback)');
       }
     } catch {
       console.log('⚠️  CoinGecko failed, using cached prices');
@@ -497,6 +526,8 @@ class ArbitrageBot {
       checkInterval: this.checkInterval,
       poolsMonitored: this.pools.size,
       tokensMonitored: Object.keys(this.tokens).length,
+      oracleSource: this.oracleSource,
+      chainlinkEnabled: this.chainlinkOracle.enabled,
       prices: this.priceCache,
       stats: this.stats,
       recentSwaps: this.history.slice(-5).reverse(),

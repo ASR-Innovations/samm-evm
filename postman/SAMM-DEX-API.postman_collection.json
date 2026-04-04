@@ -1,0 +1,535 @@
+{
+  "info": {
+    "name": "SAMM DEX API",
+    "_postman_id": "samm-dex-api",
+    "description": "Full API collection for SAMM (Sharded AMM) DEX.\n\n**Integrations:**\n- Uniswap Trading API — Quote comparison & swap execution on Sepolia\n- Chainlink CRE — Decentralized shard orchestration workflow\n- ENS — AI Agent identity & shard discovery\n\n**Networks:**\n- SAMM: RiseChain Testnet (chainId 11155931)\n- Uniswap: Sepolia (chainId 11155111)\n- Bridge: Sepolia ↔ RiseChain via OP Stack\n\n**Base URL:** `http://localhost:3000`\n\nStart the server with `node api-server.js` (requires `.env` with PRIVATE_KEY, UNISWAP_API_KEY, etc.)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "wallet", "value": "0x004566C322f5F1CBC0594928556441f8D38EA589", "type": "string" },
+    { "key": "uniswapApiKey", "value": "{{UNISWAP_API_KEY}}", "type": "string" },
+    { "key": "uniswapApiBase", "value": "https://trade-api.gateway.uniswap.org/v1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "🏥 System",
+      "description": "Health, status, and integration checks",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Server health check. Returns deployment info, wallet, arb bot status, shard manager status, and ENS registry status."
+          }
+        },
+        {
+          "name": "Integration Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/integrations", "host": ["{{baseUrl}}"], "path": ["integrations"] },
+            "description": "Status of all integrations:\n- **Uniswap**: Trading API quoter, Sepolia swap executor, Permit2 address\n- **Chainlink**: Price feeds (Sepolia), CRE workflow details\n- **ENS**: Agent registry, on-chain resolution\n\nAlso shows bridge status."
+          }
+        },
+        {
+          "name": "DEX Statistics",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/stats", "host": ["{{baseUrl}}"], "path": ["stats"] },
+            "description": "Overall DEX stats: total pairs, total shards, TVL in USD, oracle prices, contract addresses."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Tokens & Pools",
+      "description": "Query tokens, pools, and shard information",
+      "item": [
+        {
+          "name": "List Tokens",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/tokens", "host": ["{{baseUrl}}"], "path": ["tokens"] },
+            "description": "Lists all tokens deployed on RiseChain with addresses, decimals, and prices."
+          }
+        },
+        {
+          "name": "List Pools (by pair)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/pools", "host": ["{{baseUrl}}"], "path": ["pools"] },
+            "description": "Lists all pool pairs with their shards, reserves, and TVL."
+          }
+        },
+        {
+          "name": "List All Shards (flat)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/pools/all", "host": ["{{baseUrl}}"], "path": ["pools", "all"] },
+            "description": "Returns all 20 shards in a flat array format — ideal for CRE workflow consumption.\n\nEach shard includes: pair, shard name, address, tokenA, tokenB, reserveA, reserveB, liquidityUSD, tps."
+          }
+        },
+        {
+          "name": "Pool Details (WETH/USDC)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/pools/WETH/USDC", "host": ["{{baseUrl}}"], "path": ["pools", "WETH", "USDC"] },
+            "description": "Get all shards for a specific trading pair. Replace WETH/USDC with any pair like USDC/USDT, WBTC/WETH, etc."
+          }
+        },
+        {
+          "name": "On-Chain Shard Data (WETH/USDC)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/shards/WETH/USDC", "host": ["{{baseUrl}}"], "path": ["shards", "WETH", "USDC"] },
+            "description": "Reads shard data directly from the on-chain SAMMPoolFactory contract. Shows reserves, TVL, and c-value for each shard."
+          }
+        },
+        {
+          "name": "Spot Price (WETH/USDC)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/price/WETH/USDC", "host": ["{{baseUrl}}"], "path": ["price", "WETH", "USDC"] },
+            "description": "Get the current spot price for a pair, with oracle price comparison and deviation percentage."
+          }
+        }
+      ]
+    },
+    {
+      "name": "💱 Quoting & Swapping (SAMM)",
+      "description": "Get quotes and execute swaps on RiseChain SAMM pools",
+      "item": [
+        {
+          "name": "Quick Quote (GET)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/quote/WETH/USDC/100", "host": ["{{baseUrl}}"], "path": ["quote", "WETH", "USDC", "100"] },
+            "description": "Quick quote: buy 100 USDC with WETH.\n\nURL format: `/quote/:tokenIn/:tokenOut/:amountOut`\n\nReturns: amountIn, effective rate, oracle rate, slippage, fee, selected shard, and price impact."
+          }
+        },
+        {
+          "name": "Full Quote (POST, multi-hop)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/quote", "host": ["{{baseUrl}}"], "path": ["quote"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenIn\": \"WETH\",\n  \"tokenOut\": \"USDT\",\n  \"route\": [\"WETH\", \"USDC\", \"USDT\"],\n  \"amountOut\": \"100\"\n}"
+            },
+            "description": "Full quote with optional multi-hop routing.\n\nYou can specify a `route` array for multi-hop (e.g., WETH→USDC→USDT). If route is omitted, a direct path is used.\n\n**Fields:**\n- `tokenIn`: Source token symbol\n- `tokenOut`: Destination token symbol\n- `route`: Array of token symbols for path (optional)\n- `amountOut`: Amount of tokenOut to receive"
+          }
+        },
+        {
+          "name": "Execute Swap (POST)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/swap", "host": ["{{baseUrl}}"], "path": ["swap"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenIn\": \"USDC\",\n  \"tokenOut\": \"WETH\",\n  \"amountOut\": \"0.5\",\n  \"slippagePct\": \"2.0\",\n  \"recipient\": \"0x004566C322f5F1CBC0594928556441f8D38EA589\"\n}"
+            },
+            "description": "Execute a real swap on RiseChain via the CrossPoolRouter.\n\nThe backend handles:\n1. Token approval (if needed)\n2. Router quoteSwap → picks optimal shard\n3. executeSwap via TxQueue (nonce-managed)\n\n**Fields:**\n- `tokenIn`, `tokenOut`: Token symbols\n- `amountOut`: Amount to receive\n- `slippagePct`: Max slippage tolerance (default 1.0%)\n- `recipient`: Recipient address or ENS name (optional, defaults to wallet)\n- `route`: Multi-hop route array (optional)\n\n**Note:** Subject to the c-threshold limit (~0.96% of shard output reserve per swap)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚖️ SAMM vs Uniswap Comparison",
+      "description": "Compare SAMM quotes against Uniswap (Sepolia + Mainnet)",
+      "item": [
+        {
+          "name": "Compare (WETH/USDC/100)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compare/WETH/USDC/100", "host": ["{{baseUrl}}"], "path": ["compare", "WETH", "USDC", "100"] },
+            "description": "3-way comparison for buying 100 USDC with WETH:\n\n1. **SAMM** (RiseChain testnet) — on-chain quote from sharded pools\n2. **Uniswap Sepolia** (via Trading API) — same testnet tier\n3. **Uniswap Mainnet** (reference) — for context\n\nPrimary comparison is SAMM vs Sepolia Uniswap. Shows winner, delta %, savings in USD, and routing recommendation.\n\nURL format: `/compare/:tokenIn/:tokenOut/:amountOut`"
+          }
+        },
+        {
+          "name": "Compare (USDC/USDT/1000 Stablecoin)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compare/USDC/USDT/1000", "host": ["{{baseUrl}}"], "path": ["compare", "USDC", "USDT", "1000"] },
+            "description": "Stablecoin comparison: USDC→USDT at $1000 size. Tests stablecoin routing efficiency."
+          }
+        },
+        {
+          "name": "Compare (WBTC/WETH/1)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compare/WBTC/WETH/1", "host": ["{{baseUrl}}"], "path": ["compare", "WBTC", "WETH", "1"] },
+            "description": "Crypto-pair comparison: WBTC→WETH. Tests cross-asset routing."
+          }
+        },
+        {
+          "name": "Full Comparison Matrix",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compare/matrix", "host": ["{{baseUrl}}"], "path": ["compare", "matrix"] },
+            "description": "Runs comparison across all pairs and multiple trade sizes. Returns a matrix with SAMM vs Uniswap for every combination."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Uniswap Sepolia Swap",
+      "description": "Execute real swaps on Sepolia via Uniswap Trading API + Permit2",
+      "item": [
+        {
+          "name": "Uniswap Sepolia Quote",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/swap/sepolia/quote?tokenIn=0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14&tokenOut=0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238&amount=0.001",
+              "host": ["{{baseUrl}}"],
+              "path": ["swap", "sepolia", "quote"],
+              "query": [
+                { "key": "tokenIn", "value": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14", "description": "WETH9 on Sepolia" },
+                { "key": "tokenOut", "value": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", "description": "USDC on Sepolia" },
+                { "key": "amount", "value": "0.001", "description": "Amount in ETH" }
+              ]
+            },
+            "description": "Get a swap quote on Sepolia. Uses Uniswap Trading API first (with Permit2 support), falls back to V2 pair on-chain quote.\n\n**Sepolia Token Addresses:**\n- WETH9: `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14`\n- USDC: `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`\n- USDT: `0x7169D38820dfd117C3FA1f22a697dBA58d90BA06`\n- DAI: `0x68194a729C2450ad26072b3D33ADaCbcef39D574`\n- LINK: `0x779877A7B0D9E8603169DdbD7836e478b4624789`"
+          }
+        },
+        {
+          "name": "Execute Uniswap Swap (Backend-Signed)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/swap/sepolia", "host": ["{{baseUrl}}"], "path": ["swap", "sepolia"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenIn\": \"ETH\",\n  \"tokenOut\": \"USDC\",\n  \"amount\": \"0.001\",\n  \"type\": \"EXACT_INPUT\",\n  \"slippageTolerance\": 5.0\n}"
+            },
+            "description": "Execute a REAL swap on Sepolia via Uniswap Trading API — entirely through our backend.\n\n**Full flow (backend handles everything):**\n1. POST /v1/quote to Uniswap Trading API (with x-api-key)\n2. If token swap: approve token → Permit2 contract\n3. Sign EIP-712 Permit2 typed data (signTypedData on server wallet)\n4. POST /v1/swap to get unsigned tx calldata\n5. Backend signs + broadcasts the transaction to Sepolia\n6. Waits for confirmation and returns result\n\n**Fields:**\n- `tokenIn`: Token symbol (ETH, USDC, USDT, DAI, LINK) or Sepolia address\n- `tokenOut`: Token symbol or Sepolia address\n- `amount`: Amount to swap (in human-readable units, e.g. '0.001' ETH)\n- `type`: EXACT_INPUT (default) or EXACT_OUTPUT\n- `slippageTolerance`: Percentage (default 5.0 = 5%)\n\n**Supported directions:**\n- ETH → Token (no Permit2 needed)\n- Token → ETH (Permit2 approval + signature)\n- Token → Token (Permit2 approval + signature)\n\n**Response includes:** txHash, blockNumber, gasUsed, routing type, explorer link, and the full 4-step flow description."
+          }
+        },
+        {
+          "name": "Sepolia Wallet Balances",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/swap/sepolia/balances", "host": ["{{baseUrl}}"], "path": ["swap", "sepolia", "balances"] },
+            "description": "Get wallet balances on Sepolia for ETH, WETH, USDC, USDT, DAI, LINK, ROME."
+          }
+        },
+        {
+          "name": "Prepare Swap for MetaMask (Frontend Flow Step 1)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/swap/sepolia/prepare", "host": ["{{baseUrl}}"], "path": ["swap", "sepolia", "prepare"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userAddress\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f2bD95\",\n  \"tokenIn\": \"ETH\",\n  \"tokenOut\": \"USDC\",\n  \"amount\": \"0.001\",\n  \"type\": \"EXACT_INPUT\",\n  \"slippageTolerance\": 5.0\n}"
+            },
+            "description": "**Frontend-compatible swap — Step 1: Get quote for user's OWN wallet.**\n\nThe backend proxies the Uniswap Trading API but does NOT sign anything — only the user's MetaMask does.\n\n**User flow:**\n1. User connects MetaMask wallet\n2. Frontend calls this endpoint with user's address\n3. Backend returns: quote, permitData (for EIP-712 signing), routing info\n4. User signs permitData in MetaMask (signTypedData_v4)\n5. Frontend calls POST /swap/sepolia/execute with signature\n6. Backend returns unsigned tx → user signs + broadcasts in MetaMask\n\n**Key:** Backend NEVER touches the user's private key.\n\n**Response includes:** quote object, permitData (if token swap), needsPermit2Signature boolean, step-by-step instructions, and the routing type."
+          }
+        },
+        {
+          "name": "Execute Swap for MetaMask (Frontend Flow Step 2)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/swap/sepolia/execute", "host": ["{{baseUrl}}"], "path": ["swap", "sepolia", "execute"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quote\": {},\n  \"routing\": \"CLASSIC\",\n  \"signature\": \"0x...\",\n  \"permitData\": {}\n}"
+            },
+            "description": "**Frontend-compatible swap — Step 2: Get unsigned tx for MetaMask.**\n\nTakes the user's Permit2 signature from MetaMask + the quote from Step 1, calls Uniswap /v1/swap, and returns the unsigned transaction.\n\n**Fields:**\n- `quote`: The full quote object from /swap/sepolia/prepare response\n- `routing`: The routing type from prepare response (CLASSIC, WRAP, etc.)\n- `signature`: User's Permit2 EIP-712 signature from MetaMask (omit for native ETH swaps)\n- `permitData`: The permitData from prepare response (omit for native ETH swaps)\n\n**Response:** Unsigned transaction { to, data, value, gasLimit, chainId } ready for MetaMask's eth_sendTransaction.\n\n**Note:** For native ETH→Token swaps, no signature/permitData is needed."
+          }
+        },
+        {
+          "name": "Sepolia Swap History",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/swap/sepolia/history", "host": ["{{baseUrl}}"], "path": ["swap", "sepolia", "history"] },
+            "description": "History of all swaps executed on Sepolia this session."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🌉 Bridge (Sepolia ↔ RiseChain)",
+      "description": "OP Stack canonical bridge for ETH between Sepolia and RiseChain",
+      "item": [
+        {
+          "name": "Bridge Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/bridge/status", "host": ["{{baseUrl}}"], "path": ["bridge", "status"] },
+            "description": "Bridge configuration and contract addresses (L1StandardBridge, OptimismPortal)."
+          }
+        },
+        {
+          "name": "Cross-Chain Balances",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/bridge/balances", "host": ["{{baseUrl}}"], "path": ["bridge", "balances"] },
+            "description": "ETH balance on both Sepolia (L1) and RiseChain (L2) for the wallet."
+          }
+        },
+        {
+          "name": "Bridge Deposit (L1→L2)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/bridge/deposit", "host": ["{{baseUrl}}"], "path": ["bridge", "deposit"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"0.005\",\n  \"asset\": \"ETH\"\n}"
+            },
+            "description": "Deposit ETH from Sepolia (L1) to RiseChain (L2) via OP Stack canonical bridge.\n\nCalls `L1StandardBridge.depositETH(uint32 minGasLimit, bytes extraData)` with 800K gas limit.\n\nL2 delivery is near-instant on testnet.\n\n**Fields:**\n- `amount`: ETH amount to bridge (string)\n- `asset`: Only \"ETH\" supported in demo"
+          }
+        },
+        {
+          "name": "Bridge Withdraw (L2→L1)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/bridge/withdraw", "host": ["{{baseUrl}}"], "path": ["bridge", "withdraw"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"0.001\"\n}"
+            },
+            "description": "Withdraw ETH from RiseChain (L2) to Sepolia (L1). Note: L1 finalization takes time on OP Stack (challenge period)."
+          }
+        },
+        {
+          "name": "Bridge History",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/bridge/history", "host": ["{{baseUrl}}"], "path": ["bridge", "history"] },
+            "description": "History of all bridge transactions (deposits and withdrawals) this session."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔮 Oracle (Chainlink)",
+      "description": "Chainlink price feeds and oracle comparison",
+      "item": [
+        {
+          "name": "Chainlink Prices (3-way compare)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/oracle/chainlink", "host": ["{{baseUrl}}"], "path": ["oracle", "chainlink"] },
+            "description": "3-way price comparison:\n1. **Chainlink** — decentralized, DON-validated feeds on Sepolia\n2. **CoinGecko** — centralized API fallback\n3. **SAMM Spot** — on-chain pool reserves\n\nShows deviation between all three sources."
+          }
+        },
+        {
+          "name": "Oracle Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/oracle/status", "host": ["{{baseUrl}}"], "path": ["oracle", "status"] },
+            "description": "Oracle system status: which source is primary, feed status, last update time."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏷️ ENS Agent Registry",
+      "description": "ENS-based AI agent discovery and identity",
+      "item": [
+        {
+          "name": "List All Agents",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents", "host": ["{{baseUrl}}"], "path": ["agents"] },
+            "description": "Lists all SAMM agents registered on-chain with ENS names.\n\nAgents:\n- `pool-router.samm.eth` — CrossPoolRouter contract\n- `arb-bot.samm.eth` — Arbitrage Bot\n- `shard-manager.samm.eth` — Dynamic Shard Orchestrator\n- `faucet.samm.eth` — Token Faucet\n- `factory.samm.eth` — Pool Factory\n\nEach agent has: ENS name, address, text records (role, description, chain-id, version)."
+          }
+        },
+        {
+          "name": "Agent Details (arb-bot)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/agents/arb-bot", "host": ["{{baseUrl}}"], "path": ["agents", "arb-bot"] },
+            "description": "Get detailed info for a specific agent by name.\n\nReturns: agent metadata, ENS name resolution (verifies on-chain address matches), text records.\n\nTry: `pool-router`, `arb-bot`, `shard-manager`, `faucet`, `factory`"
+          }
+        },
+        {
+          "name": "ENS Shard Registry",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/registry/shards", "host": ["{{baseUrl}}"], "path": ["registry", "shards"] },
+            "description": "Lists all shards registered in the on-chain ENS registry. Each shard has a `.samm.eth` subdomain."
+          }
+        },
+        {
+          "name": "Balance via ENS (vitalik.eth)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/balances/vitalik.eth", "host": ["{{baseUrl}}"], "path": ["balances", "vitalik.eth"] },
+            "description": "Query token balances using an ENS name instead of an address. The backend resolves ENS names via Ethereum mainnet.\n\nThis demonstrates ENS integration across the entire API — any endpoint that accepts an address also accepts ENS names."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🤖 Arbitrage Bot",
+      "description": "Chainlink-powered arbitrage bot for pool rebalancing",
+      "item": [
+        {
+          "name": "Arb Bot Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/arbitrage/status", "host": ["{{baseUrl}}"], "path": ["arbitrage", "status"] },
+            "description": "Current arb bot status: running state, oracle source (Chainlink/CoinGecko), cycle count, swap count, prices, tx queue stats."
+          }
+        },
+        {
+          "name": "Arb Bot History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/arbitrage/history?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["arbitrage", "history"],
+              "query": [
+                { "key": "limit", "value": "20", "description": "Number of entries to return (default 50)" },
+                { "key": "pair", "value": "", "description": "Filter by pair (e.g., WETH-USDC)", "disabled": true },
+                { "key": "status", "value": "", "description": "Filter by status (success/failed/error)", "disabled": true }
+              ]
+            },
+            "description": "Arbitrage swap history with pre/post deviations, tx hashes, gas used. Filterable by pair and status."
+          }
+        },
+        {
+          "name": "Start Arb Bot",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/arbitrage/start", "host": ["{{baseUrl}}"], "path": ["arbitrage", "start"] },
+            "description": "Start the arbitrage bot. It will check all 20 shards every 30s and rebalance any shard with >0.30% deviation from Chainlink oracle prices."
+          }
+        },
+        {
+          "name": "Stop Arb Bot",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/arbitrage/stop", "host": ["{{baseUrl}}"], "path": ["arbitrage", "stop"] },
+            "description": "Stop the arbitrage bot."
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚡ Dynamic Sharding",
+      "description": "TPS-based shard split/merge management",
+      "item": [
+        {
+          "name": "Shard Manager Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/sharding/status", "host": ["{{baseUrl}}"], "path": ["sharding", "status"] },
+            "description": "Dynamic shard manager status: running state, shard count per pair, TPS data, split/merge thresholds, min shards per pair."
+          }
+        },
+        {
+          "name": "CRE Workflow Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/sharding/cre-status", "host": ["{{baseUrl}}"], "path": ["sharding", "cre-status"] },
+            "description": "Chainlink CRE (Compute Runtime Environment) workflow status.\n\nShows: workflow existence, config, trigger schedule, split/merge TPS thresholds, Chainlink price feeds used, how to simulate.\n\nThe CRE workflow runs on Chainlink DON for decentralized shard orchestration."
+          }
+        },
+        {
+          "name": "🔴 CRE Workflow Simulation (LIVE Chainlink Feeds)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/sharding/cre-simulate", "host": ["{{baseUrl}}"], "path": ["sharding", "cre-simulate"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "description": "Runs the full CRE workflow logic LIVE:\n\n1. **Reads Chainlink price feeds on-chain** from Sepolia (ETH/USD, BTC/USD, USDC/USD, DAI/USD) — real AggregatorV3.latestRoundData() calls\n2. **Fetches SAMM pool data** from the running API (reserves, TPS, shard counts)\n3. **Computes shard decisions** using TPS thresholds (split ≥250, merge ≤62.5)\n4. **Detects price deviations** for arbitrage signals\n\n**3-Shard Protection:** The 3 original shards (Small/Medium/Large) are NEVER removed. Only Dynamic shards can be merged/split.\n\n**Response includes:**\n- Live Chainlink prices with roundId, staleness, feed addresses\n- Shard decisions: SPLIT, MERGE (dynamic only), NO_ACTION, PRICE_CHECK\n- originalShardsProtected count and dynamicShardsToRemove count\n- Architecture description: CronCapability, DON consensus, thresholds\n\nThis mirrors what runs on the Chainlink DON every 60 seconds."
+          }
+        },
+        {
+          "name": "Start Shard Manager",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/sharding/start", "host": ["{{baseUrl}}"], "path": ["sharding", "start"] },
+            "description": "Start the dynamic shard manager. Checks every 60s, maintains minimum 3 shards per pair."
+          }
+        },
+        {
+          "name": "Stop Shard Manager",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/sharding/stop", "host": ["{{baseUrl}}"], "path": ["sharding", "stop"] },
+            "description": "Stop the dynamic shard manager."
+          }
+        },
+        {
+          "name": "Force Shard Check",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/sharding/check", "host": ["{{baseUrl}}"], "path": ["sharding", "check"] },
+            "description": "Trigger an immediate shard check cycle (split/merge analysis based on current TPS)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Balances",
+      "description": "Query token balances on RiseChain",
+      "item": [
+        {
+          "name": "All Balances (by address)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/balances/{{wallet}}", "host": ["{{baseUrl}}"], "path": ["balances", "{{wallet}}"] },
+            "description": "Get all token balances for an address on RiseChain. Supports ENS names (e.g., `/balances/vitalik.eth`)."
+          }
+        },
+        {
+          "name": "Single Token Balance",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/balance/{{wallet}}/WETH", "host": ["{{baseUrl}}"], "path": ["balance", "{{wallet}}", "WETH"] },
+            "description": "Get balance for a specific token. URL: `/balance/:address/:token`"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔧 Uniswap Trading API (Direct)",
+      "description": "Direct calls to Uniswap Trading API — for understanding the Permit2 flow",
+      "item": [
+        {
+          "name": "1. Get Quote (EXACT_INPUT)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{uniswapApiBase}}/quote", "host": ["{{uniswapApiBase}}"], "path": ["quote"] },
+            "header": [
+              { "key": "x-api-key", "value": "{{uniswapApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenIn\": \"0x0000000000000000000000000000000000000000\",\n  \"tokenOut\": \"0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238\",\n  \"tokenInChainId\": 11155111,\n  \"tokenOutChainId\": 11155111,\n  \"type\": \"EXACT_INPUT\",\n  \"amount\": \"1000000000000000\",\n  \"swapper\": \"0x004566C322f5F1CBC0594928556441f8D38EA589\",\n  \"slippageTolerance\": 5.0\n}"
+            },
+            "description": "**Step 1 of the Permit2 swap flow.**\n\nGet a quote from Uniswap Trading API.\n\n**Token addresses (Sepolia):**\n- Native ETH: `0x0000000000000000000000000000000000000000`\n- WETH9: `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14`\n- USDC: `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`\n\n**Response contains:**\n- `routing`: CLASSIC, WRAP, UNWRAP, or UniswapX\n- `quote`: Quote details with amountIn/amountOut\n- `permitData`: EIP-712 typed data for Permit2 signing (if token swap)\n\n**Amount is in wei** (1000000000000000 = 0.001 ETH)"
+          }
+        },
+        {
+          "name": "2. Get Swap Calldata",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{uniswapApiBase}}/swap", "host": ["{{uniswapApiBase}}"], "path": ["swap"] },
+            "header": [
+              { "key": "x-api-key", "value": "{{uniswapApiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quote\": \"<paste quote object from step 1>\",\n  \"signature\": \"<paste Permit2 signature if token swap>\",\n  \"permitData\": \"<paste permitData from step 1 if present>\"\n}"
+            },
+            "description": "**Step 2 of the Permit2 swap flow.**\n\nAfter getting a quote, post the quote + Permit2 signature to get unsigned transaction calldata.\n\n**For CLASSIC routing:**\n- POST to `/v1/swap` with { quote, signature?, permitData? }\n\n**For UniswapX routing:**\n- POST to `/v1/order` with { quote, signature }\n\n**Response:** Unsigned transaction with `to`, `data`, `value`, `gasLimit`\n\n**Then:** Sign with wallet.sendTransaction() and broadcast.\n\n⚠️ This request requires real data from Step 1 — use the test script `scripts/test-swap-routing.js` for the full automated flow."
+          }
+        }
+      ]
+    }
+  ]
+}
