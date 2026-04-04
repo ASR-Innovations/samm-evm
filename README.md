@@ -6,8 +6,93 @@ A novel DEX protocol implementing **sharded liquidity pools** with dynamic fee o
 
 ## What Is SAMM?
 
-Traditional AMMs force every trade — regardless of size — through one enormous pool.  
-SAMM inverts this by **sharding** each token pair into multiple pools of increasing size:
+SAMM: The First Dynamically Sharded AMM
+By Horizontally scaling, we achieve 5x-16x throughput and upto 15x higher LP returns 
+
+## A) LP Revenue Optimization
+
+SAMM enhances LP returns by:
+
+- **Fee Differentiation**: Smaller shards offer better fee incentives to LPs, driving liquidity rebalancing.
+- **Increased Utilization**: During high demand, dynamic scaling ensures more trades and higher fee income.
+- **Minimized Idle Capital**: In low-demand regimes, LPs consolidate in a single shard for maximum ROI.
+
+Simulation results show:
+- Up to **15× higher LP returns** vs static multi-shard AMMs under variable load
+- Lower impermanent loss due to price convergence
+
+<img width="1550" height="774" alt="image" src="https://github.com/user-attachments/assets/66437907-7efb-495e-b0ec-96c8a611c3d8" />
+
+## B) Throughput Scaling
+
+Testnet deployments indicate:
+- Solana: 1 shard ~129 TPS → 4 shards = ~720 TPS
+- Sui: 1 shard ~214 TPS → 4 shards = ~520 TPS
+- Risechain: Adaptive scaling with linear performance up to 8 shards
+
+Throughput benefits:
+- **5×–16×** scaling during peak load
+- **<500ms** average latency under 1000 TPS
+
+<img width="1222" height="822" alt="image" src="https://github.com/user-attachments/assets/f310b13b-0144-4316-a9ee-06a092a571d6" />
+
+<img width="1246" height="612" alt="image" src="https://github.com/user-attachments/assets/108b6073-25dc-4f6d-8219-9f8b29c68a1b" />
+
+## Polynomial Fee Function
+
+SAMM introduces a **bounded-ratio polynomial fee function** to balance liquidity across shards.
+
+### Formula:
+
+$$
+\text{Fee}(\Delta) = \frac{R_B}{R_A} \cdot \Delta \cdot \max\left\{ r_{\min}, \min\left\{ r_{\max}, \beta_1 R_A^{\beta_2} R_B^{\beta_3} \Delta^{\beta_4} + \beta_5 \right\} \right\}
+$$
+
+Where:
+- $\Delta$: amount traded
+- $(R_A, R_B\)$: token reserves
+- $(\beta_i)$: tunable coefficients
+- $(r_{\min}$, r_{\max}\): fee ratio bounds
+
+### Intuition:
+- Larger trades → higher marginal fee
+- Smaller shards → cheaper trades
+- Traders are incentivized to route to underutilized shards
+
+---
+
+## c-Non-Splitting Property
+
+SAMM satisfies the **c-non-splitting property**:
+
+>A trade below size $(c \cdot R)$ is cheaper when executed on a single shard than split across multiple.
+
+where
+
+- c is a constant less than 1 - a parameter chosen by the protocol to define a threshold for small trades. It represents the fraction of the pool's reserves.
+- 𝑅 refers to the reserve size of a shard's liquidity pool (typically the minimum
+
+### Benefits:
+- Traders do not gain from splitting
+- Execution remains parallelizable
+- Strategyproof for atomic trades
+
+This allows SAMM to retain the simplicity of a single AMM while distributing execution.
+
+---
+
+## Smaller-Better Principle
+
+SAMM satisfies the **Smaller-Better Principle**:
+
+>Among shards with equal prices, **smaller shards are cheaper** due to lower polynomial fees. 
+
+This leads to:
+
+- Flow toward smaller pools
+- Equalized liquidity across shards
+- Automatic load balancing over time
+
 
 | Tier | TVL Target | Best For |
 |------|-----------|----------|
