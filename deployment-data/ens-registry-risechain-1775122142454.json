@@ -1,0 +1,42 @@
+{
+  "network": "risechain-testnet",
+  "chainId": 11155931,
+  "deployer": "0x004566C322f5F1CBC0594928556441f8D38EA589",
+  "timestamp": 1775122142454,
+  "contracts": {
+    "SAMMAgentRegistry": "0xCa46f85973d0f13377744fBE8D26ABBdc93a241B"
+  },
+  "agents": [
+    {
+      "name": "pool-router",
+      "ensName": "pool-router.samm.eth",
+      "address": "0x6A45347a8DbC629000F725c544D695209b0c3d00",
+      "role": "routing"
+    },
+    {
+      "name": "arb-bot",
+      "ensName": "arb-bot.samm.eth",
+      "address": "0x004566C322f5F1CBC0594928556441f8D38EA589",
+      "role": "arbitrage"
+    },
+    {
+      "name": "shard-manager",
+      "ensName": "shard-manager.samm.eth",
+      "address": "0x93174f86F57A97827680c279e07704AbE2a0b0c0",
+      "role": "shard-orchestration"
+    },
+    {
+      "name": "token-faucet",
+      "ensName": "faucet.samm.eth",
+      "address": "0x42a930BF9259cE3D9e76bb1d8C61b52daf68dBE4",
+      "role": "token-distribution"
+    },
+    {
+      "name": "pool-factory",
+      "ensName": "factory.samm.eth",
+      "address": "0xc4c6ceABeBBfA1Bf9D219fE80F5b95982664fb94",
+      "role": "pool-creation"
+    }
+  ],
+  "shardCount": 0
+}
