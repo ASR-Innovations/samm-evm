@@ -1,0 +1,7 @@
+staging:
+  user-workflow:
+    workflow-name: "samm-shard-orchestrator"
+  workflow-artifacts:
+    workflow-path: "."
+    config-path: "./config.json"
+    secrets-path: ""

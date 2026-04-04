@@ -1,0 +1,7 @@
+# CRE Project Configuration
+# SAMM Shard Orchestrator
+
+staging:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com

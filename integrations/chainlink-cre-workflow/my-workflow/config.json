@@ -1,0 +1,35 @@
+{
+  "schedule": "0 * * * * *",
+  "chainName": "ethereum-testnet-sepolia",
+  "sammApiUrl": "http://localhost:3000",
+  "splitTpsThreshold": 250,
+  "mergeTpsThreshold": 62.5,
+  "maxShardsPerPair": 10,
+  "minShardsPerPair": 3,
+  "minDeviationPct": 0.3,
+  "feeds": [
+    {
+      "name": "ETH/USD",
+      "address": "0x694AA1769357215DE4FAC081bf1f309aDC325306"
+    },
+    {
+      "name": "BTC/USD",
+      "address": "0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43"
+    },
+    {
+      "name": "USDC/USD",
+      "address": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E"
+    },
+    {
+      "name": "DAI/USD",
+      "address": "0x14866185B1962B63C3Ea9E03Bc1da838bab34C19"
+    }
+  ],
+  "pairs": [
+    { "tokenA": "WETH", "tokenB": "USDC" },
+    { "tokenA": "USDC", "tokenB": "USDT" },
+    { "tokenA": "WETH", "tokenB": "USDT" },
+    { "tokenA": "WBTC", "tokenB": "USDC" },
+    { "tokenA": "USDC", "tokenB": "DAI" }
+  ]
+}

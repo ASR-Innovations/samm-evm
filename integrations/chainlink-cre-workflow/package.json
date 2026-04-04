@@ -1,0 +1,11 @@
+{
+  "name": "samm-cre-workflow",
+  "version": "1.0.0",
+  "description": "Chainlink CRE workflow for SAMM shard orchestration",
+  "scripts": {
+    "postinstall": "bun x cre-setup"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "latest"
+  }
+}

@@ -1,0 +1,4 @@
+node_modules/
+contracts/
+bun.lock
+.cre_build_tmp.js
