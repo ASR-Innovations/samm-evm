@@ -43,8 +43,9 @@ describe("Rust Implementation Verification", function () {
       expect(fee).to.equal(0n);
     });
 
-    it("should match Rust: minimal fee for large pool", function () {
-      // Large pool (1M), small trade (100) -> minimal fee
+    it("should match Rust: adaptive fee for large pool small trade", function () {
+      // Large pool (1M), small trade (100) -> tmp=1 < max_fee_num=125 -> ADAPTIVE branch
+      // Small trades pay UP TO 5x base fee under the Rust SAMM formula.
       const outputAmount = 100n;
       const outputReserve = 1000000n;
       const inputReserve = 1000000n;
@@ -53,15 +54,18 @@ describe("Rust Implementation Verification", function () {
 
       const fee = calculateFeeSAMM(outputAmount, outputReserve, inputReserve, feeNumerator, feeDenominator);
 
-      // Calculate expected: output * fee_num * input_res / output_res / fee_denom
-      const expected = (outputAmount * feeNumerator * inputReserve) / (outputReserve * feeDenominator);
+      // tmp = 100*12*10000 / (10*1M) = 1  (< max_fee_num=125) -> adaptive branch
+      const maxFeeNumerator = feeNumerator * 5n;
+      const tmp = (outputAmount * 12n * feeDenominator) / (10n * outputReserve);
+      const expected = (outputAmount * (maxFeeNumerator - tmp) * inputReserve) / (outputReserve * feeDenominator);
 
-      expect(fee).to.equal(expected);
-      console.log(`      Minimal fee: ${fee} (expected: ${expected})`);
+      expect(fee).to.equal(expected); // expected = 1n
+      console.log(`      Adaptive fee (large pool, small trade): ${fee} (expected: ${expected})`);
     });
 
-    it("should match Rust: adaptive fee for smaller pool", function () {
-      // Smaller pool (10k), larger trade (1k) -> adaptive fee
+    it("should match Rust: minimal fee for smaller pool large trade", function () {
+      // Smaller pool (10k), large trade (1k = 10%) -> tmp=1200 > max_fee_num=125 -> MINIMAL branch
+      // Large trades (OA/RB > ~1%) hit the minimal fee cap under the Rust SAMM formula.
       const outputAmount = 1000n;
       const outputReserve = 10000n;
       const inputReserve = 10000n;
@@ -70,13 +74,11 @@ describe("Rust Implementation Verification", function () {
 
       const fee = calculateFeeSAMM(outputAmount, outputReserve, inputReserve, feeNumerator, feeDenominator);
 
-      // Calculate tmp
-      const maxFeeNumerator = feeNumerator * 5n;
-      const tmp = (outputAmount * 12n * feeDenominator) / (10n * outputReserve);
-      const expected = (outputAmount * (maxFeeNumerator - tmp) * inputReserve) / (outputReserve * feeDenominator);
+      // tmp = 1000*12*10000 / (10*10000) = 1200  (> max_fee_num=125) -> minimal branch
+      const expected = (outputAmount * feeNumerator * inputReserve) / (outputReserve * feeDenominator);
 
-      expect(fee).to.equal(expected);
-      console.log(`      Adaptive fee: ${fee} (expected: ${expected})`);
+      expect(fee).to.equal(expected); // expected = 2n
+      console.log(`      Minimal fee (smaller pool, large trade): ${fee} (expected: ${expected})`);
     });
 
     it("should match Rust: exact boundary case", function () {
@@ -90,7 +92,7 @@ describe("Rust Implementation Verification", function () {
       const fee = calculateFeeSAMM(outputAmount, outputReserve, inputReserve, feeNumerator, feeDenominator);
 
       console.log(`      Boundary fee: ${fee}`);
-      expect(fee).to.be.gt(0n);
+      expect(fee > 0n).to.be.true;
     });
 
     it("should match Rust: unequal reserves", function () {
@@ -104,7 +106,7 @@ describe("Rust Implementation Verification", function () {
       const fee = calculateFeeSAMM(outputAmount, outputReserve, inputReserve, feeNumerator, feeDenominator);
 
       console.log(`      Unequal reserves fee: ${fee}`);
-      expect(fee).to.be.gt(0n);
+      expect(fee > 0n).to.be.true;
     });
   });
 
@@ -158,7 +160,7 @@ describe("Rust Implementation Verification", function () {
       const newInvariant = (sourceReserve + result.sourceAmountSwapped) * (destReserve - result.destinationAmountSwapped);
 
       // Due to ceiling division, new invariant should be >= old
-      expect(newInvariant).to.be.gte(oldInvariant);
+      expect(newInvariant >= oldInvariant).to.be.true;
       console.log(`      Old invariant: ${oldInvariant}, New: ${newInvariant}`);
     });
 
@@ -244,9 +246,9 @@ describe("Rust Implementation Verification", function () {
 
       // Verify components
       expect(result.amountOut).to.equal(1000n);
-      expect(result.amountIn).to.be.gt(1000n); // Must be more due to fees + price impact
-      expect(result.tradeFee).to.be.gt(0n);
-      expect(result.ownerFee).to.equal(0n); // (1000 * 10) / 10000 = 1 (rounds down to 0 in some cases)
+      expect(result.amountIn > 1000n).to.be.true; // Must be more due to fees + price impact
+      expect(result.tradeFee > 0n).to.be.true;
+      expect(result.ownerFee).to.equal(1n); // (1000 * 10) / 10000 = 1
 
       // Verify total
       expect(result.amountIn).to.equal(result.sourceAmountSwapped + result.tradeFee + result.ownerFee);
@@ -267,7 +269,7 @@ describe("Rust Implementation Verification", function () {
       console.log(`        Fee: ${result.tradeFee} (on ${result.amountOut} output)`);
       console.log(`        Fee %: ${(result.tradeFee * 10000n) / result.amountOut} bps`);
 
-      expect(result.tradeFee).to.be.gt(0n);
+      expect(result.tradeFee > 0n).to.be.true;
     });
 
     it("should match Rust: small trade low fee", function () {
@@ -285,7 +287,7 @@ describe("Rust Implementation Verification", function () {
       console.log(`        Fee: ${result.tradeFee} (on ${result.amountOut} output)`);
       console.log(`        Fee %: ${(result.tradeFee * 10000n) / result.amountOut} bps`);
 
-      expect(result.tradeFee).to.be.gt(0n);
+      expect(result.tradeFee > 0n).to.be.true;
     });
 
     it("should match Rust: verify fee scaling", function () {
@@ -298,8 +300,10 @@ describe("Rust Implementation Verification", function () {
       console.log(`      Small trade fee: ${smallFeePercent} bps`);
       console.log(`      Large trade fee: ${largeFeePercent} bps`);
 
-      // Larger trades should pay higher fee percentage
-      expect(largeFeePercent).to.be.gt(smallFeePercent);
+      // Rust SAMM formula: small trades hit adaptive branch (up to 5x base fee),
+      // large trades (OA/RB > ~1%) hit minimal branch (1x base fee).
+      // So small trades pay HIGHER fee percentage than large trades.
+      expect(smallFeePercent > largeFeePercent).to.be.true;
     });
   });
 
@@ -325,7 +329,7 @@ describe("Rust Implementation Verification", function () {
         fee = (outputAmount * (maxFeeNumerator - tmp) * inputReserve) / (outputReserve * feeDenominator);
       }
 
-      expect(fee).to.be.gt(0n);
+      expect(fee > 0n).to.be.true;
       console.log(`      Large value fee: ${fee}`);
     });
 

@@ -1,227 +1,93 @@
-# SAMM — Sharded Automated Market Maker
+# SAMM — Sharded Automated Market Maker on Solana
 
-A novel DEX protocol implementing **sharded liquidity pools** with dynamic fee optimisation, TPS-driven auto-scaling, and an integrated arbitrage rebalancer. Live on **RiseChain Testnet**.
+A novel DEX protocol implementing **sharded liquidity pools** with dynamic fee optimisation, TPS-driven auto-scaling, and an integrated arbitrage rebalancer — deployed live on **Solana Devnet**.
 
 ---
 
 ## What Is SAMM?
 
-SAMM: The First Dynamically Sharded AMM
-By Horizontally scaling, we achieve 5x-16x throughput and upto 15x higher LP returns 
+SAMM horizontally shards liquidity pools to achieve **5×–16× throughput scaling** and **up to 15× higher LP returns** compared to single-pool AMMs. Each trading pair has multiple pool shards (Small/Medium/Large/XL), and the router automatically selects the optimal shard(s) for each trade.
 
-## A) LP Revenue Optimization
+### Key Properties
 
-SAMM enhances LP returns by:
+**c-Non-Splitting Property:** Trades below size `c × R` are cheaper executed on a single shard than split.
 
-- **Fee Differentiation**: Smaller shards offer better fee incentives to LPs, driving liquidity rebalancing.
-- **Increased Utilization**: During high demand, dynamic scaling ensures more trades and higher fee income.
-- **Minimized Idle Capital**: In low-demand regimes, LPs consolidate in a single shard for maximum ROI.
+**Smaller-Better Principle:** Among shards with equal reserves, smaller shards charge lower fees — routing naturally flows to underutilized pools.
 
-Simulation results show:
-- Up to **15× higher LP returns** vs static multi-shard AMMs under variable load
-- Lower impermanent loss due to price convergence
-
-<img width="1550" height="774" alt="image" src="https://github.com/user-attachments/assets/66437907-7efb-495e-b0ec-96c8a611c3d8" />
-
-## B) Throughput Scaling
-
-Testnet deployments indicate:
-- Solana: 1 shard ~129 TPS → 4 shards = ~720 TPS
-- Sui: 1 shard ~214 TPS → 4 shards = ~520 TPS
-- Risechain: Adaptive scaling with linear performance up to 8 shards
-
-Throughput benefits:
-- **5×–16×** scaling during peak load
-- **<500ms** average latency under 1000 TPS
-
-<img width="1222" height="822" alt="image" src="https://github.com/user-attachments/assets/f310b13b-0144-4316-a9ee-06a092a571d6" />
-
-<img width="1246" height="612" alt="image" src="https://github.com/user-attachments/assets/108b6073-25dc-4f6d-8219-9f8b29c68a1b" />
-
-## Polynomial Fee Function
-
-SAMM introduces a **bounded-ratio polynomial fee function** to balance liquidity across shards.
-
-$$
-\text{fee} = \max\!\bigl(r_{\min},\; \beta_1 \cdot \tfrac{O_A}{R_A} + r_{\max}\bigr)
-$$
-
-### Intuition:
-- Larger trades → higher marginal fee
-- Smaller shards → cheaper trades
-- Traders are incentivized to route to underutilized shards
-
----
-
-## c-Non-Splitting Property
-
-SAMM satisfies the **c-non-splitting property**:
-
->A trade below size $(c \cdot R)$ is cheaper when executed on a single shard than split across multiple.
-
-where
-
-- c is a constant less than 1 - a parameter chosen by the protocol to define a threshold for small trades. It represents the fraction of the pool's reserves.
-- 𝑅 refers to the reserve size of a shard's liquidity pool (typically the minimum
-
-### Benefits:
-- Traders do not gain from splitting
-- Execution remains parallelizable
-- Strategyproof for atomic trades
-
-This allows SAMM to retain the simplicity of a single AMM while distributing execution.
-
----
-
-## Smaller-Better Principle
-
-SAMM satisfies the **Smaller-Better Principle**:
-
->Among shards with equal prices, **smaller shards are cheaper** due to lower polynomial fees. 
-
-This leads to:
-
-- Flow toward smaller pools
-- Equalized liquidity across shards
-- Automatic load balancing over time
-
-
-| Tier | TVL Target | Best For |
-|------|-----------|----------|
-| Small | $250 K | Trades < $1 K |
-| Medium | $1 M | Trades $1 K – $5 K |
-| Large | $5 M | Trades $5 K+ |
-| Dynamic | auto-scaled | Spill-over during high TPS |
-
-The **CrossPoolRouter** automatically selects the **smallest shard** that can handle your trade.  
-Smaller shards → lower fees → better rates (the **c-smaller-better** property from the SAMM litepaper).
+**Atomic Multi-Hop Routing:** USDC→DAI→WETH can be done in a single Solana transaction — no intermediate custody.
 
 ### Fee Formula
 
-$$
-\text{fee} = \max\!\bigl(r_{\min},\; \beta_1 \cdot \tfrac{O_A}{R_A} + r_{\max}\bigr)
-$$
+```
+fee = max(r_min, β₁ × (OA/RA) + r_max)
+```
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
-| β₁ | −250 000 | Steep fee curve slope |
-| rₘᵢₙ | 100 (0.01%) | Floor fee rate |
-| rₘₐₓ | 2 500 (0.25%) | Ceiling fee rate |
-| c | 9 600 (0.96%) | Shard eligibility threshold |
+| β₁ | −0.25 | Fee curve slope (negative = decreasing with trade size) |
+| r_min | 0.01% | Floor fee rate (large trades) |
+| r_max | 0.25% | Ceiling fee rate (small trades) |
+| c | 0.96 | Shard eligibility threshold |
+
+**Stable pairs:** 5 bps (0.05%)  
+**Regular pairs:** 10 bps (0.10%)  
+**Multi-hop:** sum of per-hop fees (e.g. WBTC→USDC→DAI = 15 bps)
 
 ---
 
 ## Architecture
 
 ```
-                          ┌──────────────────────┐
-                          │  api-server.js (REST) │  ← port 3000
-                          └──────┬───────────────┘
-                    ┌────────────┼────────────────┐
-                    ▼            ▼                ▼
-          arbitrage-bot.js  dynamic-shard-     tx-queue.js
-          (rebalancer)      manager.js         (nonce serialiser)
-                    │        (TPS scaler)          │
-                    └────────────┼────────────────┘
-                                 ▼
-                    ┌────────────────────────┐
-                    │   RiseChain Testnet     │
-                    │   (Solidity contracts)  │
-                    └────────────────────────┘
-                                 │
-          ┌──────────────────────┼──────────────────────┐
-          ▼                      ▼                      ▼
-   CrossPoolRouter        SAMMPoolFactory        DynamicShardOrchestrator
-          │                      │
-          ▼                      ▼
-    SAMMPool shards        SAMMCurve / SAMMFees
-    (20 live pools)        (math libraries)
+┌──────────────────────────────────────────────────────────┐
+│                   api-server.js (REST)                    │
+│                       port 3000                           │
+└──────┬────────────────┬───────────────┬──────────────────┘
+       │                │               │
+       ▼                ▼               ▼
+ samm-router.js   arbitrage-bot.js  dynamic-shard-manager.js
+ (atomic routing)  (rebalancer)      (TPS-driven scaling)
+       │                │               │
+       └────────────────┴───────────────┘
+                         │
+                         ▼
+               solana-client/index.js
+               (SPL Token Swap CPI)
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │  Solana Devnet      │
+              │  spl-samm program   │
+              │  29 pool shards     │
+              └─────────────────────┘
 ```
 
-### On-Chain Contracts
+### Pool Configuration
 
-| Contract | Purpose |
-|----------|---------|
-| **SAMMPool** | Individual liquidity shard with SAMM curve |
-| **SAMMPoolFactory** | Creates & indexes shards per pair |
-| **CrossPoolRouter** | Multi-hop swaps with auto shard selection |
-| **DynamicShardOrchestrator** | On-chain shard creation (called by backend) |
-| **SAMMCurve / SAMMFees** | Pure-math libraries for pricing |
-| **TokenFaucet** | Testnet token dispenser |
+**7 trading pairs × 4 shards each = 28 pools**
 
-### Off-Chain Backend
+| Pair | Type | Fee | Shards |
+|------|------|-----|--------|
+| USDC-USDT | Stable | 5 bps | Small/Medium/Large/XL |
+| USDC-DAI | Stable | 5 bps | Small/Medium/Large/XL |
+| USDT-DAI | Stable | 5 bps | Small/Medium/Large/XL |
+| WETH-USDC | Regular | 10 bps | Small/Medium/Large/XL |
+| WETH-USDT | Regular | 10 bps | Small/Medium/Large/XL |
+| WBTC-USDC | Regular | 10 bps | Small/Medium/Large/XL |
+| WETH-WBTC | Regular | 10 bps | Small/Medium/Large/XL |
 
-| Module | Purpose |
-|--------|---------|
-| **api-server.js** | Express REST API — auto-discovers deployment, starts subsystems |
-| **arbitrage-bot.js** | Monitors every shard for oracle deviation, rebalances with 50% gap closure |
-| **dynamic-shard-manager.js** | Reads TPS, applies litepaper §6 formula: n = min(⌈TPS/50⌉, 10) |
-| **tx-queue.js** | Serialises all wallet transactions to prevent nonce collisions |
+Shard sizes per side: **Small $10k · Medium $50k · Large $200k · XL $1M**
 
----
+### Multi-Hop Routes (automatic)
 
-## Security Model
+| Route | Path | Total Fee |
+|-------|------|-----------|
+| WBTC ↔ DAI | WBTC→USDC→DAI | 15 bps |
+| WBTC ↔ USDT | WBTC→USDC→USDT | 15 bps |
+| WETH ↔ DAI | WETH→USDC→DAI | 15 bps |
+| DAI ↔ WETH | DAI→USDC→WETH | 50 bps* |
+| DAI ↔ WBTC | DAI→USDC→WBTC | 50 bps* |
 
-> **The backend wallet sends transactions.** The arb bot and shard manager use a single `PRIVATE_KEY` to sign rebalancing swaps and create new shards. This is by design.
-
-| Component | Sends Txs? | Why |
-|-----------|-----------|-----|
-| Arb Bot | ✅ | Rebalances shard reserves toward oracle price |
-| Shard Manager | ✅ | Creates new shards when TPS exceeds capacity |
-| `POST /swap` | ✅ | Executes user-requested swaps via the backend wallet |
-| `GET /quote` | ❌ | Read-only — calls `calculateSwapSAMM()` view function |
-| All GET endpoints | ❌ | Read-only on-chain queries |
-
-### What's Protected
-
-- **`.env` is gitignored** — the private key never enters the repo.
-- **Railway deployment** injects `PRIVATE_KEY` and `RISECHAIN_RPC_URL` as environment variables via the dashboard.
-- The `POST /swap`, `POST /arbitrage/*`, and `POST /sharding/*` endpoints require the wallet to be initialised (i.e. `PRIVATE_KEY` must be set in the environment). Without it, the server runs in **read-only mode** — all GET and quote endpoints still work.
-
-### Public Repo Considerations
-
-Since this repo is public:
-
-1. **Never commit `.env`** — it is already in `.gitignore`.
-2. The deployment data in `deployment-data/` contains only **contract addresses** (public on-chain data).
-3. Anyone can call the API, but the `POST /swap` endpoint spends **the server's own tokens** (testnet faucet tokens with zero real-world value).
-4. The arb bot and shard manager run server-side only — the server wallet holds only testnet tokens minted by the faucet.
-
----
-
-## Live Deployment (RiseChain Testnet)
-
-**Chain ID:** 11155931  
-**RPC:** `https://testnet.riselabs.xyz/http`
-
-### Core Contracts
-
-| Contract | Address |
-|----------|---------|
-| SAMMPoolFactory | `0xc4c6ceABeBBfA1Bf9D219fE80F5b95982664fb94` |
-| CrossPoolRouter | `0x6A45347a8DbC629000F725c544D695209b0c3d00` |
-| DynamicShardOrchestrator | `0x93174f86F57A97827680c279e07704AbE2a0b0c0` |
-| TokenFaucet | `0x42a930BF9259cE3D9e76bb1d8C61b52daf68dBE4` |
-
-### Tokens
-
-| Token | Address | Decimals |
-|-------|---------|----------|
-| WETH | `0x0234367975aCbcBe49867dD36bf37C7d05C2E743` | 18 |
-| USDC | `0x1B40c25A7cDF5b11c67dc956d6b63EEaE1C349B0` | 6 |
-| USDT | `0xa95558713D7E6D3F41bC70E867323A84404586f9` | 6 |
-| WBTC | `0xD35648Ad048e450aFd22f3421cE6A5EFFC40DC4D` | 8 |
-| DAI | `0x51A046A489da585eB5875845FdC7323c0f1F0606` | 18 |
-
-### Liquidity Shards — 20 pools, ~$32.8M TVL
-
-| Pair | Shards | Combined TVL |
-|------|--------|-------------|
-| WETH-USDC | Small, Medium, Large, Dynamic | ~$6.60M |
-| USDC-USDT | Small, Medium, Large, Dynamic | ~$6.50M |
-| WETH-USDT | Small, Medium, Large, Dynamic | ~$6.60M |
-| WBTC-USDC | Small, Medium, Large, Dynamic | ~$6.56M |
-| USDC-DAI  | Small, Medium, Large, Dynamic | ~$6.50M |
+*Higher fee when routing through old pool shards with 25-bps on-chain fee config.
 
 ---
 
@@ -230,7 +96,8 @@ Since this repo is public:
 ### Prerequisites
 
 - Node.js ≥ 18
-- npm
+- Rust (for the SAMM math binary)
+- Solana CLI (optional, for manual deployment)
 
 ### Install
 
@@ -240,50 +107,110 @@ cd samm-evm
 npm install
 ```
 
+### Build Rust Binary
+
+The routing math runs through a native Rust binary for guaranteed precision:
+
+```bash
+cd rust-samm && cargo build --release
+# Binary at: rust-samm/target/release/samm
+```
+
 ### Configure
 
 ```bash
 cp .env.example .env
-# Edit .env — set PRIVATE_KEY and RISECHAIN_RPC_URL
 ```
 
-### Compile Contracts
+Edit `.env`:
 
-```bash
-npx hardhat compile
 ```
+SOLANA_RPC_URL=https://api.devnet.solana.com
+SOLANA_PROGRAM_ID=AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ
+SOLANA_PRIVATE_KEY=<your-base58-keypair>
 
-### Run Tests
+# Arbitrage bot
+ENABLE_ARBITRAGE=true
+ARB_CHECK_INTERVAL=20000
+MAX_SWAP_USD=500
 
-```bash
-npx hardhat test                     # all Hardhat tests
-npx hardhat test test/unit/          # unit tests only
-npm run test:swap-matrix             # on-chain swap matrix (requires RiseChain)
-```
+# Dynamic sharding
+ENABLE_DYNAMIC_SHARDING=true
+SHARD_CHECK_INTERVAL=60000
 
-### Deploy (fresh)
-
-```bash
-npm run deploy:risechain             # full production deploy
-npm run deploy:faucet                # token faucet
-npm run deploy:router                # router only
+# API server
+PORT=3000
 ```
 
 ### Start the API Server
 
 ```bash
 npm start
+# or:
+node api-server.js
 ```
 
-The server auto-discovers the latest `production-risechain-*.json` file in `deployment-data/`, starts the arb bot and shard manager, and listens on the configured port.
+The server:
+- Loads `deployment-data/solana-devnet.json` (pool addresses)
+- Starts the arb bot after 3 seconds (if `ENABLE_ARBITRAGE=true`)
+- Starts the shard manager after 8 seconds (if `ENABLE_DYNAMIC_SHARDING=true`)
+- Listens on port 3000
 
-### Verify All APIs
+---
+
+## Deployment Scripts
+
+### Initialize Pools (run once, or to add new shards)
 
 ```bash
-npm run verify:apis
+node scripts/initialize-pools.js
 ```
 
-Runs 42 read-only tests against every endpoint (no swaps executed).
+Creates 7 pairs × 4 shards = 28 pools on devnet. Idempotent — existing shards are skipped.
+
+### Verify Pools
+
+```bash
+node scripts/verify-pools.js
+```
+
+Reads every pool on-chain and reports reserves, prices, and deviations.
+
+### Quick Swap Test
+
+```bash
+node scripts/test-swap.js USDC USDT 10
+node scripts/test-swap.js WETH USDC 50
+node scripts/test-swap.js WBTC DAI 5     # 2-hop route
+```
+
+---
+
+## Testing
+
+### All Swap Pairs (quotes only, instant)
+
+```bash
+node scripts/test-all-swaps.js
+```
+
+### All Swap Pairs (live on-chain, ~5 min)
+
+```bash
+node scripts/test-all-swaps.js --execute
+```
+
+Executes $1-equivalent swaps for all 20 A→B and B→A combinations across all 7 pairs + multi-hop routes.
+
+### Full User Flow Demo
+
+```bash
+node scripts/user-swap-flow.js                  # USDC→USDT 10 (default)
+node scripts/user-swap-flow.js WBTC DAI 5       # WBTC→DAI via 2-hop route
+node scripts/user-swap-flow.js WETH USDC 50     # WETH→USDC direct
+```
+
+Demonstrates: faucet → quote → execute → verify balances.
 
 ---
 
@@ -291,141 +218,195 @@ Runs 42 read-only tests against every endpoint (no swaps executed).
 
 Base URL: `http://localhost:3000`
 
-### Read-Only Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Server health + deployment info |
-| `GET` | `/tokens` | All tokens with CoinGecko prices |
-| `GET` | `/pools` | All pairs with shards and TVL |
-| `GET` | `/pools/:tokenA/:tokenB` | Shards for a specific pair |
-| `GET` | `/shards/:tokenA/:tokenB` | Shard details direct from chain |
-| `GET` | `/quote/:tokenIn/:tokenOut/:amount` | Single-hop quote (fee, slippage, shard) |
-| `POST` | `/quote` | Multi-hop quote (body: `{ route, amountOut }`) |
-| `GET` | `/price/:tokenA/:tokenB` | Spot price + oracle deviation |
-| `GET` | `/balance/:address/:token` | Token balance |
-| `GET` | `/balances/:address` | All token balances for address |
-| `GET` | `/stats` | DEX-wide stats (TVL, pair count, shard names) |
-| `GET` | `/arbitrage/status` | Arb bot running status |
-| `GET` | `/arbitrage/history` | Recent arb swap log |
-| `GET` | `/sharding/status` | Shard manager status + TPS readings |
-
-### Write Endpoints (require `PRIVATE_KEY`)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/swap` | Execute swap (server wallet signs tx) |
-| `POST` | `/arbitrage/start` | Start arb bot |
-| `POST` | `/arbitrage/stop` | Stop arb bot |
-| `POST` | `/sharding/start` | Start shard manager |
-| `POST` | `/sharding/stop` | Stop shard manager |
-| `POST` | `/sharding/check` | Trigger immediate shard check |
-
-### Example Queries
+### Health & Info
 
 ```bash
-# Quick quote — buy 100 USDC with WETH
-curl http://localhost:3000/quote/WETH/USDC/100
-
-# Multi-hop quote — WETH → USDC → USDT
-curl -X POST http://localhost:3000/quote \
-  -H "Content-Type: application/json" \
-  -d '{"route":["WETH","USDC","USDT"],"amountOut":"500"}'
-
-# Spot price
-curl http://localhost:3000/price/WETH/USDC
-
-# DEX stats
+curl http://localhost:3000/health
+curl http://localhost:3000/tokens
 curl http://localhost:3000/stats
 ```
 
----
+### Pool Data
 
-## Deployment to Railway
-
-The repo includes `railway.json` and `nixpacks.toml` for one-click Railway deployment.
-
-Set these environment variables in Railway's dashboard:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PRIVATE_KEY` | Yes | Wallet private key (no `0x` prefix) |
-| `RISECHAIN_RPC_URL` | Yes | RiseChain RPC endpoint |
-| `PORT` | No | Defaults to 3000 |
-| `ENABLE_ARBITRAGE` | No | `true` to auto-start arb bot |
-| `ENABLE_DYNAMIC_SHARDING` | No | `true` to auto-start shard manager |
-
----
-
-## Project Structure
-
-```
-samm-evm/
-├── contracts/                             # Solidity source
-│   ├── SAMMPool.sol                       #   Liquidity pool shard
-│   ├── SAMMPoolFactory.sol                #   Factory for creating shards
-│   ├── CrossPoolRouter.sol                #   Multi-hop swap router
-│   ├── DynamicShardOrchestrator.sol       #   On-chain shard creator
-│   ├── TokenFaucet.sol                    #   Testnet faucet
-│   ├── interfaces/                        #   ISAMMPool, ISAMMPoolFactory, ICrossPoolRouter
-│   └── libraries/                         #   SAMMCurve.sol, SAMMFees.sol
-├── api-server.js                          # REST API server (Express)
-├── arbitrage-bot.js                       # Oracle-deviation rebalancer
-├── dynamic-shard-manager.js               # TPS-driven shard scaler
-├── tx-queue.js                            # Nonce-safe tx serialiser
-├── hardhat.config.js                      # Hardhat configuration
-├── package.json                           # Dependencies & npm scripts
-├── railway.json                           # Railway deployment config
-├── nixpacks.toml                          # Nixpacks build config
-├── .env.example                           # Environment variable template
-├── config/                                # Chain configs (chains.json)
-├── deployment-data/                       # Contract addresses (auto-generated)
-├── scripts/
-│   ├── deploy-production-risechain.js     # Full production deploy
-│   ├── deploy-production-risechain-v2.js  # V2 deploy variant
-│   ├── deploy-crosspool-router-risechain.js
-│   ├── deploy-faucet-risechain.js
-│   ├── validate-risechain-swap-matrix.js  # On-chain swap matrix test
-│   ├── comprehensive-e2e-test-risechain.js
-│   ├── comprehensive-swap-analysis.js     # Detailed swap analysis
-│   ├── verify-all-apis.js                 # 42-test API verification
-│   ├── bench-batched.js                   # Batched RPC TPS benchmark
-│   ├── bench-sustained-tps.js             # Sustained TPS benchmark
-│   ├── tps-load-test.js                   # TPS load generator
-│   └── initialize-empty-pools.js          # Pool init utility
-├── test/                                  # Hardhat / Mocha tests
-│   ├── unit/                              #   Unit tests
-│   ├── offchain/                          #   Off-chain math verification
-│   ├── *.property.test.js                 #   Property-based tests (fast-check)
-│   └── *.test.js                          #   Integration tests
-├── test-results/                          # Benchmark outputs (gitignored)
-└── Research.md                            # SAMM litepaper & research notes
+```bash
+curl http://localhost:3000/pools                    # all 28+ shards with TVL
+curl http://localhost:3000/pools/WETH/USDC          # shards for a pair
+curl http://localhost:3000/price/WETH/USDC          # spot price vs oracle
 ```
 
----
+### Balances
 
-## Key Concepts
-
-### c-Smaller-Better Property
-
-The SAMM litepaper's core insight: for a given trade size, the **smallest eligible shard always gives the best rate**. The router enforces this — it iterates shards from smallest to largest and uses the first one where the trade-to-reserve ratio stays within the c-threshold.
-
-### TPS-Driven Dynamic Sharding (Litepaper §6)
-
-When on-chain TPS exceeds a per-shard capacity, the shard manager creates additional shards:
-
-```
-n = min(⌈TPS / PER_SHARD_TPS⌉, MAX_SHARDS_PER_PAIR)
+```bash
+curl http://localhost:3000/balances/<wallet-address>         # all tokens
+curl http://localhost:3000/balance/<wallet-address>/USDC     # single token
 ```
 
-Default: 50 TPS per shard, max 10 shards per pair.
+### Quote
+
+```bash
+# GET — quick quote
+curl http://localhost:3000/quote/USDC/USDT/100
+curl http://localhost:3000/quote/WBTC/DAI/5         # multi-hop auto-route
+
+# POST — same, accepts JSON body
+curl -X POST http://localhost:3000/quote \
+  -H "Content-Type: application/json" \
+  -d '{"tokenIn":"WETH","tokenOut":"USDC","amountOut":"50"}'
+```
+
+**Response includes:** `amountIn`, `amountOut`, `effectiveRate`, `routePath`, `hops`, `totalFeeBps`, `priceImpactPct`, full `hopDetails` with per-leg breakdown.
+
+### Execute Swap
+
+```bash
+curl -X POST http://localhost:3000/swap \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tokenIn":    "USDC",
+    "tokenOut":   "USDT",
+    "amountOut":  "100",
+    "slippagePct": "1.0"
+  }'
+```
+
+**Returns:** `{ success, txHash, amountIn, routePath, hops, feeBps, priceImpactPct, explorer }`
+
+### Faucet (devnet only)
+
+```bash
+curl -X POST http://localhost:3000/faucet \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address": "<your-wallet-address>",
+    "tokens":  {"USDC": 1000, "WETH": 1, "WBTC": 0.01}
+  }'
+```
+
+Mints test tokens to any wallet. Caps: USDC/USDT/DAI ≤ 10,000 · WETH ≤ 5 · WBTC ≤ 0.1 per request.
 
 ### Arbitrage Bot
 
-Monitors every shard's spot price against CoinGecko oracles. When deviation exceeds 0.3%, it executes a corrective swap sized at 50% of the gap. A 3-cycle cooldown per shard prevents oscillation.
+```bash
+curl http://localhost:3000/arbitrage/status
+curl http://localhost:3000/arbitrage/history?limit=20
+curl -X POST http://localhost:3000/arbitrage/start
+curl -X POST http://localhost:3000/arbitrage/stop
+```
+
+### Dynamic Shard Manager
+
+```bash
+curl http://localhost:3000/sharding/status
+curl -X POST http://localhost:3000/sharding/start
+curl -X POST http://localhost:3000/sharding/check   # trigger manual check
+```
 
 ---
 
-## License
+## How User Transactions Work
 
-MIT
+### Current Setup (Server Keypair)
+
+The server signs and submits transactions using its own keypair (`SOLANA_PRIVATE_KEY`). This is suitable for:
+- Testing with faucet tokens
+- Arb bot operation
+- Demo environments
+
+### Production dApp Flow
+
+For a real user-facing application:
+
+```
+1. GET /quote/:tokenIn/:tokenOut/:amountOut
+   → amountIn, fees, route path, price impact (no signing)
+
+2. Frontend builds the transaction using samm-router.js buildAtomicTransaction()
+   (or calls a future POST /build-tx endpoint that returns a base64 transaction)
+
+3. User's wallet (Phantom, Backpack, Solflare, etc.) receives the unsigned transaction,
+   displays what it will do, and user approves → wallet signs with user's keypair
+
+4. Frontend submits the signed transaction to Solana RPC
+   → Returns: transaction signature
+
+5. Frontend polls confirmTransaction() or /tx/:signature
+   → Shows success/failure + explorer link
+```
+
+The transaction structure (built by `buildAtomicTransaction` in [samm-router.js](samm-router.js)):
+
+```
+For each hop in the route:
+  1. createAssociatedTokenAccountIdempotent(output_mint)   — create ATA if needed
+  For each shard used in the hop:
+  2. Approve(user_source_ATA, pool_authority, max_amount_in)
+  3. SwapSAMM(pool, exact_amount_out, max_amount_in)       — pool PDA signs via invoke_signed
+```
+
+All instructions are in **one atomic transaction** — either all succeed or all fail.
+
+---
+
+## Deployed Program
+
+| Network | Program ID |
+|---------|-----------|
+| Solana Devnet | `AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ` |
+
+Pool and token addresses are in `deployment-data/solana-devnet.json`.
+
+---
+
+## File Structure
+
+```
+samm-evm/
+├── api-server.js              # Express REST API (port 3000)
+├── samm-router.js             # Multi-hop atomic router
+├── solana-adapter.js          # Thin adapter layer
+├── arbitrage-bot.js           # Oracle-based rebalancer
+├── dynamic-shard-manager.js   # TPS-driven shard creator
+├── tx-queue.js                # Serial transaction queue
+├── solana-client/
+│   └── index.js               # Pool state reader + swap instruction builder
+├── rust-samm/                 # Native Rust math binary
+│   └── src/
+│       ├── samm.rs            # Exact-output SAMM formula
+│       ├── fees.rs            # Adaptive + paper fee calculations
+│       └── curve.rs           # Constant-product curve
+├── scripts/
+│   ├── initialize-pools.js    # Create all 28 pool shards
+│   ├── verify-pools.js        # Verify on-chain pool state
+│   ├── test-swap.js           # Quick single swap test
+│   ├── test-all-swaps.js      # Comprehensive swap matrix
+│   └── user-swap-flow.js      # End-to-end user flow demo
+└── deployment-data/
+    └── solana-devnet.json     # Pool + token addresses
+```
+
+---
+
+## Security Model
+
+| Component | Sends Txs? | Why |
+|-----------|-----------|-----|
+| `POST /swap` | ✅ | Executes swap with server keypair |
+| `POST /faucet` | ✅ | Mints test tokens (server is mint authority) |
+| Arb Bot | ✅ | Rebalances pools toward oracle price |
+| Shard Manager | ✅ | Creates new shards when TPS exceeds limit |
+| All GET endpoints | ❌ | Read-only — no transactions |
+| `GET /quote` | ❌ | Read-only — Rust CLI math + pool state reads |
+
+**`.env` is gitignored** — private key never enters the repo.
+
+The server runs in **read-only mode** (all GET/quote endpoints work) if `SOLANA_PRIVATE_KEY` is not set.
+
+---
+
+## Throughput Characteristics
+
+- **Single shard:** ~129 TPS on Solana
+- **4 shards:** ~720 TPS (5.6× scaling)
+- **Auto-scaling:** shard manager creates new shards when TPS exceeds `PER_SHARD_TPS × current_shards`
+- **Atomic routing:** multi-hop routes add only 1 transaction overhead vs N separate txs
+- **Price impact:** typically < 0.01% for $1–100 trades across 28 pools

@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ['nodejs-18_x']
+nixPkgs = ['nodejs_20', 'rustc', 'cargo']
 
 [phases.install]
-cmds = ['npm install --production']
+cmds = [
+  'cd rust-samm && cargo build --release',
+  'npm install --production',
+]
 
 [start]
 cmd = 'node api-server.js'

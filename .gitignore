@@ -7,17 +7,12 @@ package-lock.json
 .env.local
 .env.*.local
 
-# Build output
-cache/
-artifacts/
-typechain-types/
+# Solana build output
+solana-program/target/
+target/
 
-# Coverage
-coverage/
-coverage.json
-
-# Hardhat
-.hardhat/
+# Solana keypair files (keep .example files)
+*.keypair.json
 
 # Logs
 *.log
@@ -48,3 +43,18 @@ deployments/
 
 # Test results (auto-generated)
 test-results/
+
+# Rust build output
+rust-samm/target/
+
+# Temp / migration notes
+MIGRATION_TODO.md
+
+# Server logs
+/tmp/samm-*.log
+
+# Old EVM artifacts (if accidentally restored)
+hardhat.config.js
+typechain-types/
+artifacts/
+cache/

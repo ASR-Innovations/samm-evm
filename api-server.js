@@ -1,21 +1,26 @@
+'use strict';
 /**
- * SAMM DEX API Server
+ * SAMM DEX API Server — Solana edition
  *
- * Self-contained — just run `node api-server.js` with a .env file.
- * No CLI params needed. Auto-discovers deployment, starts arb bot
- * and dynamic shard manager with shared TxQueue.
+ * Just run `node api-server.js` with a .env file.
+ * Reads pools from deployment-data/solana-devnet.json.
+ * Auto-starts arb bot and dynamic shard manager when a keypair is present.
  */
+
 const express = require('express');
-const cors = require('cors');
-const { ethers } = require('ethers');
-const fs = require('fs');
-const path = require('path');
-const ArbitrageBot = require('./arbitrage-bot');
+const cors    = require('cors');
+const fs      = require('fs');
+const path    = require('path');
+const { execSync } = require('child_process');
+const { Connection, Keypair } = require('@solana/web3.js');
+const bs58 = require('bs58');
+const SolanaAdapter = require('./solana-adapter');
+const ArbitrageBot  = require('./arbitrage-bot');
 const DynamicShardManager = require('./dynamic-shard-manager');
 const TxQueue = require('./tx-queue');
 require('dotenv').config();
 
-// ─── Process-level error handlers (prevent crash on RPC 429 etc) ────
+// ─── Process-level error handlers ─────────────────────────────────
 process.on('uncaughtException', (err) => {
   console.error(`\n⚠️  Uncaught exception (non-fatal): ${err.message?.slice(0, 150)}`);
 });
@@ -28,67 +33,41 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ─── Config ─────────────────────────────────────────────────────
-function findLatestDeployment() {
-  if (process.env.DEPLOYMENT_FILE) return process.env.DEPLOYMENT_FILE;
-  const deployDir = path.join(__dirname, 'deployment-data');
-  const files = fs.readdirSync(deployDir)
-    .filter(f => f.startsWith('production-risechain-') && f.endsWith('.json'))
-    .sort().reverse();
-  if (files.length === 0) throw new Error('No deployment files found');
-  return files[0];
+// BigInt-safe JSON serialization (BigInt → string to avoid "Do not know how to serialize a BigInt")
+app.set('json replacer', (_key, val) => typeof val === 'bigint' ? val.toString() : val);
+
+// ─── Config ───────────────────────────────────────────────────────
+const PORT        = parseInt(process.env.PORT || '3000');
+const RPC_URL     = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+const DEPLOYMENT_FILE = process.env.DEPLOYMENT_FILE || 'solana-devnet.json';
+const deploymentPath  = path.join(__dirname, 'deployment-data', DEPLOYMENT_FILE);
+
+let deployment;
+try {
+  deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
+} catch (e) {
+  console.error(`Failed to load ${deploymentPath}: ${e.message}`);
+  process.exit(1);
 }
 
-function normalizePK(pk) {
-  return pk.startsWith('0x') ? pk : `0x${pk}`;
+const PROGRAM_ID = process.env.SOLANA_PROGRAM_ID || deployment.programId;
+
+const connection = new Connection(RPC_URL, 'confirmed');
+
+// Wallet keypair (optional — read-only mode without it)
+let keypair  = null;
+let txQueue  = null;
+if (process.env.SOLANA_PRIVATE_KEY) {
+  const raw = bs58.decode(process.env.SOLANA_PRIVATE_KEY);
+  keypair  = Keypair.fromSecretKey(raw);
+  txQueue  = new TxQueue(connection, keypair);
 }
 
-const DEPLOYMENT_FILE = findLatestDeployment();
-const deploymentPath = path.join(__dirname, 'deployment-data', DEPLOYMENT_FILE);
-const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
+const adapter = new SolanaAdapter(connection, keypair, deployment, PROGRAM_ID);
+const SAMMRouter = require('./samm-router');
+const router = new SAMMRouter(connection, keypair, deployment, PROGRAM_ID);
 
-const RPC_URL = process.env.RISECHAIN_RPC_URL || 'https://testnet.riselabs.xyz/http';
-const provider = new ethers.JsonRpcProvider(RPC_URL);
-const PORT = parseInt(process.env.PORT || '3000');
-
-// Wallet + TxQueue (created once, shared everywhere)
-let wallet = null;
-let txQueue = null;
-if (process.env.PRIVATE_KEY) {
-  wallet = new ethers.Wallet(normalizePK(process.env.PRIVATE_KEY), provider);
-  txQueue = new TxQueue(wallet, provider);
-}
-
-// Contracts & state
-let router;
-const tokens = {};
-const poolCache = new Map();
-let arbitrageBot = null;
-let shardManager = null;
-
-// ABIs
-const POOL_ABI = [
-  'function getReserves() view returns (uint256, uint256)',
-  'function tokenA() view returns (address)',
-  'function tokenB() view returns (address)',
-  'function totalSupply() view returns (uint256)',
-  'function calculateSwapSAMM(uint256,address,address) view returns (tuple(uint256 amountIn, uint256 amountOut, uint256 tradeFee, uint256 ownerFee))',
-  'function swapSAMM(uint256,uint256,address,address,address) external returns (uint256)',
-];
-const ROUTER_ABI = [
-  'function quoteSwap((address tokenIn, address tokenOut, uint256 amountOut)[] hops) view returns (tuple(uint256 expectedAmountIn, uint256[] hopAmountsIn, uint256[] hopFees, address[] selectedShards, uint256[] priceImpacts))',
-  'function executeSwap((address tokenIn, address tokenOut, uint256 amountOut)[] hops, uint256 maxAmountIn, address recipient) external returns (tuple(uint256 totalAmountIn, uint256 totalAmountOut, uint256 totalFees, uint256[] hopAmountsIn, uint256[] hopAmountsOut, uint256[] hopFees, address[] selectedShards))',
-];
-const TOKEN_ABI = [
-  'function approve(address,uint256) external returns (bool)',
-  'function balanceOf(address) view returns (uint256)',
-  'function allowance(address,address) view returns (uint256)',
-  'function decimals() view returns (uint8)',
-  'function symbol() view returns (string)',
-  'function name() view returns (string)',
-];
-
-// ─── Oracle ─────────────────────────────────────────────────────
+// ─── Oracle ───────────────────────────────────────────────────────
 const geckoIds = { WETH: 'ethereum', WBTC: 'bitcoin', USDC: 'usd-coin', USDT: 'tether', DAI: 'dai' };
 let oraclePrices = {};
 let lastOracleUpdate = 0;
@@ -96,9 +75,11 @@ let lastOracleUpdate = 0;
 async function refreshOracle() {
   if (Date.now() - lastOracleUpdate < 60_000 && Object.keys(oraclePrices).length > 0) return oraclePrices;
   try {
-    const ids = Object.values(geckoIds).join(',');
-    const resp = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`,
-      { signal: AbortSignal.timeout(10000) });
+    const ids  = Object.values(geckoIds).join(',');
+    const resp = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`,
+      { signal: AbortSignal.timeout(10000) },
+    );
     if (resp.ok) {
       const data = await resp.json();
       for (const [sym, id] of Object.entries(geckoIds)) {
@@ -106,115 +87,129 @@ async function refreshOracle() {
       }
       lastOracleUpdate = Date.now();
     }
-  } catch { /* fall through */ }
-  for (const [sym, d] of Object.entries(deployment.contracts.tokens)) {
+  } catch { /* fall through to deployment prices */ }
+
+  for (const [sym, d] of Object.entries(deployment.tokens)) {
     if (!oraclePrices[sym]) oraclePrices[sym] = d.price;
   }
   return oraclePrices;
 }
 
-// ─── Initialize ─────────────────────────────────────────────────
-async function initialize() {
-  await refreshOracle();
-
-  router = new ethers.Contract(deployment.contracts.router, ROUTER_ABI, wallet || provider);
-
-  for (const [symbol, data] of Object.entries(deployment.contracts.tokens)) {
-    tokens[symbol] = {
-      address: data.address,
-      decimals: data.decimals,
-      price: oraclePrices[symbol] || data.price,
-      contract: new ethers.Contract(data.address, TOKEN_ABI, wallet || provider),
-    };
-  }
-
-  console.log('✅ Initialized:', DEPLOYMENT_FILE);
-  console.log(`📍 Router: ${deployment.contracts.router}`);
-  console.log(`📍 Factory: ${deployment.contracts.factory}`);
-  console.log(`🪙 Tokens: ${Object.keys(tokens).join(', ')}`);
-
-  if (!wallet) {
-    console.log('\n⏸️  No PRIVATE_KEY — read-only mode (no arb bot, no shard manager)');
-    return;
-  }
-
-  console.log(`\n📡 TxQueue ready (wallet: ${wallet.address})`);
-
-  // Auto-start arb bot (unless ENABLE_ARBITRAGE=false)
-  if (process.env.ENABLE_ARBITRAGE !== 'false') {
-    console.log('\n🤖 Starting arbitrage bot...');
-    arbitrageBot = new ArbitrageBot(DEPLOYMENT_FILE, normalizePK(process.env.PRIVATE_KEY), RPC_URL, txQueue);
-    try { await arbitrageBot.start(); }
-    catch (e) { console.error('⚠️  Arb bot error (non-fatal):', e.message?.slice(0, 100)); }
-  }
-
-  // Auto-start shard manager (unless ENABLE_DYNAMIC_SHARDING=false)
-  if (process.env.ENABLE_DYNAMIC_SHARDING !== 'false') {
-    console.log('\n🔧 Starting dynamic shard manager...');
-    shardManager = new DynamicShardManager(DEPLOYMENT_FILE, normalizePK(process.env.PRIVATE_KEY), RPC_URL, txQueue);
-    setTimeout(async () => {
-      try { await shardManager.start(); }
-      catch (e) { console.error('⚠️  Shard manager error (non-fatal):', e.message?.slice(0, 100)); }
-    }, 5000);
-  }
+// ─── Helpers ──────────────────────────────────────────────────────
+function formatUnits(raw, decimals) {
+  const s = raw.toString().padStart(decimals + 1, '0');
+  const idx = s.length - decimals;
+  return `${s.slice(0, idx)}.${s.slice(idx)}`;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────
+function parseUnits(amount, decimals) {
+  const [int, frac = ''] = String(amount).split('.');
+  const padded = frac.padEnd(decimals, '0').slice(0, decimals);
+  return BigInt(int + padded);
+}
+
+const poolStateCache = new Map();
+
 async function getPoolData(poolAddress) {
-  const cached = poolCache.get(poolAddress);
-  if (cached && Date.now() - cached.timestamp < 10000) return cached.data;
+  const cached = poolStateCache.get(poolAddress);
+  if (cached && Date.now() - cached.ts < 10_000) return cached.data;
 
-  const pool = new ethers.Contract(poolAddress, POOL_ABI, provider);
-  const [reserves, tA, tB] = await Promise.all([pool.getReserves(), pool.tokenA(), pool.tokenB()]);
+  const r = await adapter.getReserves(poolAddress);
+  const mintAStr = r.mintA.toBase58();
 
-  let symA, symB, decA, decB;
-  for (const [sym, d] of Object.entries(tokens)) {
-    if (d.address.toLowerCase() === tA.toLowerCase()) { symA = sym; decA = d.decimals; }
-    if (d.address.toLowerCase() === tB.toLowerCase()) { symB = sym; decB = d.decimals; }
+  // Resolve symbols from mint addresses
+  let symA, symB, decA = r.decimalsA, decB = r.decimalsB;
+  for (const [sym, d] of Object.entries(deployment.tokens)) {
+    if (d.mint === mintAStr)   { symA = sym; decA = d.decimals ?? r.decimalsA; }
+    if (d.mint === r.mintB.toBase58()) { symB = sym; decB = d.decimals ?? r.decimalsB; }
   }
 
   const data = {
-    address: poolAddress, tokenA: symA, tokenB: symB,
-    tokenAAddress: tA, tokenBAddress: tB,
-    reserveA: ethers.formatUnits(reserves[0], decA),
-    reserveB: ethers.formatUnits(reserves[1], decB),
+    address:  poolAddress,
+    tokenA:   symA,
+    tokenB:   symB,
+    mintA:    mintAStr,
+    mintB:    r.mintB.toBase58(),
+    reserveA: formatUnits(r.reserveA, decA),
+    reserveB: formatUnits(r.reserveB, decB),
+    reserveARaw: r.reserveA,
+    reserveBRaw: r.reserveB,
+    decimalsA: decA,
+    decimalsB: decB,
   };
-  poolCache.set(poolAddress, { data, timestamp: Date.now() });
+  poolStateCache.set(poolAddress, { data, ts: Date.now() });
   return data;
 }
 
-function findShardName(addr) {
-  for (const shards of Object.values(deployment.contracts.shards)) {
-    for (const s of shards) {
-      if (s.address.toLowerCase() === addr.toLowerCase()) return s.name;
-    }
-  }
-  return addr.slice(0, 12) + '…';
+// ─── Rust SAMM binary ──────────────────────────────────────────────
+const RUST_BINARY = path.join(__dirname, 'rust-samm', 'target', 'release', 'samm');
+const RUST_BINARY_AVAILABLE = fs.existsSync(RUST_BINARY);
+
+function rustCall(subcommand, params) {
+  const json = JSON.stringify(params);
+  const out  = execSync(`"${RUST_BINARY}" ${subcommand} '${json}'`, {
+    encoding: 'utf8', timeout: 5000,
+  });
+  return JSON.parse(out.trim());
 }
 
-function buildHops(routeArray, amountOut) {
-  const hops = [];
-  for (let i = 0; i < routeArray.length - 1; i++) {
-    const tIn = tokens[routeArray[i]], tOut = tokens[routeArray[i + 1]];
-    if (!tIn || !tOut) throw new Error(`Invalid token: ${routeArray[i]} or ${routeArray[i + 1]}`);
-    hops.push({
-      tokenIn: tIn.address, tokenOut: tOut.address,
-      amountOut: i === routeArray.length - 2 ? ethers.parseUnits(amountOut.toString(), tOut.decimals) : 0n,
-    });
+// ─── Module-level instances (started in initialize()) ─────────────
+let arbitrageBot = null;
+let shardManager = null;
+
+// ─── Initialize ───────────────────────────────────────────────────
+async function initialize() {
+  await refreshOracle();
+
+  if (!keypair) {
+    console.log('\n⏸️  No SOLANA_PRIVATE_KEY — read-only mode (no arb bot, no shard manager)');
+    return;
   }
-  return hops;
+
+  console.log(`\n📡 Wallet: ${keypair.publicKey.toBase58()}`);
+  const balance = await connection.getBalance(keypair.publicKey);
+  console.log(`   Balance: ${(balance / 1e9).toFixed(4)} SOL`);
+
+  if (!PROGRAM_ID) {
+    console.log('\n⚠️  SOLANA_PROGRAM_ID not set — deploy first, then add to .env');
+    return;
+  }
+
+  // Auto-start arb bot (non-blocking — don't await, let server start first)
+  if (process.env.ENABLE_ARBITRAGE !== 'false') {
+    setTimeout(() => {
+      arbitrageBot = new ArbitrageBot(DEPLOYMENT_FILE, keypair, connection, txQueue, PROGRAM_ID);
+      arbitrageBot.start().catch(e => console.error('⚠️  Arb bot error:', e.message?.slice(0, 100)));
+    }, 3000);
+  }
+
+  // Auto-start shard manager (non-blocking)
+  if (process.env.ENABLE_DYNAMIC_SHARDING !== 'false') {
+    setTimeout(() => {
+      shardManager = new DynamicShardManager(DEPLOYMENT_FILE, keypair, connection, txQueue, PROGRAM_ID);
+      shardManager.start().catch(e => console.error('⚠️  Shard manager error:', e.message?.slice(0, 100)));
+    }, 8000);
+  }
 }
 
-// ═════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 //  ENDPOINTS
-// ═════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 
 // ── Health ──
 app.get('/health', async (req, res) => {
   await refreshOracle();
+  const walletInfo = keypair ? {
+    address: keypair.publicKey.toBase58(),
+    balance: await connection.getBalance(keypair.publicKey).then(b => (b / 1e9).toFixed(4)),
+  } : null;
   res.json({
-    status: 'ok', deployment: DEPLOYMENT_FILE, chain: deployment.chain || 'risechain',
-    oraclePrices, wallet: wallet?.address || null,
+    status: 'ok',
+    deployment: DEPLOYMENT_FILE,
+    network: deployment.network,
+    programId: PROGRAM_ID || null,
+    oraclePrices,
+    wallet: walletInfo,
     arbitrageBot: arbitrageBot ? { running: arbitrageBot.isRunning, stats: arbitrageBot.stats } : { enabled: false },
     shardManager: shardManager ? { running: shardManager.isRunning } : { enabled: false },
     txQueue: txQueue?.getStats() || null,
@@ -224,25 +219,34 @@ app.get('/health', async (req, res) => {
 // ── Tokens ──
 app.get('/tokens', async (req, res) => {
   await refreshOracle();
-  res.json({ tokens: Object.entries(tokens).map(([sym, d]) => ({
-    symbol: sym, address: d.address, decimals: d.decimals, price: oraclePrices[sym] || d.price,
+  res.json({ tokens: Object.entries(deployment.tokens).map(([sym, d]) => ({
+    symbol: sym, mint: d.mint, decimals: d.decimals,
+    price: oraclePrices[sym] || d.price,
   })) });
 });
 
 // ── All pools ──
 app.get('/pools', async (req, res) => {
   try {
+    if (!PROGRAM_ID) return res.json({ pools: [], note: 'Program not deployed yet' });
     await refreshOracle();
     const pools = [];
-    for (const [pair, shards] of Object.entries(deployment.contracts.shards)) {
+    for (const [pair, shards] of Object.entries(deployment.pools)) {
+      if (!shards.length) continue;
       const sd = await Promise.all(shards.map(async (s) => {
-        const pd = await getPoolData(s.address);
-        const liq = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1) +
-                    parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
-        return { name: s.name, address: s.address, tokenA: pd.tokenA, tokenB: pd.tokenB,
-          reserveA: pd.reserveA, reserveB: pd.reserveB, liquidityUSD: Math.round(liq) };
+        try {
+          const pd = await getPoolData(s.address);
+          const liq = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1)
+                    + parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
+          return { name: s.name, address: s.address, mintA: pd.mintA, mintB: pd.mintB,
+            tokenA: pd.tokenA, tokenB: pd.tokenB,
+            reserveA: pd.reserveA, reserveB: pd.reserveB,
+            liquidityUSD: Math.round(liq) };
+        } catch (e) {
+          return { name: s.name, address: s.address, error: e.message?.slice(0, 60) };
+        }
       }));
-      pools.push({ pair, shards: sd, totalLiquidityUSD: sd.reduce((a, b) => a + b.liquidityUSD, 0) });
+      pools.push({ pair, shards: sd, totalLiquidityUSD: sd.reduce((a, b) => a + (b.liquidityUSD || 0), 0) });
     }
     res.json({ pools, totalPairs: pools.length, totalShards: pools.reduce((a, p) => a + p.shards.length, 0) });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -252,14 +256,13 @@ app.get('/pools', async (req, res) => {
 app.get('/pools/:tokenA/:tokenB', async (req, res) => {
   try {
     const { tokenA, tokenB } = req.params;
-    const shards = deployment.contracts.shards[`${tokenA}-${tokenB}`] ||
-                   deployment.contracts.shards[`${tokenB}-${tokenA}`];
-    if (!shards) return res.status(404).json({ error: 'Pair not found', pairs: Object.keys(deployment.contracts.shards) });
+    const shards = adapter.getPoolsForPair(tokenA, tokenB);
+    if (!shards.length) return res.status(404).json({ error: 'Pair not found or no pools deployed', pairs: Object.keys(deployment.pools) });
     await refreshOracle();
     const sd = await Promise.all(shards.map(async (s) => {
       const pd = await getPoolData(s.address);
-      const liq = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1) +
-                  parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
+      const liq = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1)
+                + parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
       return { name: s.name, address: s.address, tokenA: pd.tokenA, tokenB: pd.tokenB,
         reserveA: pd.reserveA, reserveB: pd.reserveB, liquidityUSD: Math.round(liq) };
     }));
@@ -267,203 +270,138 @@ app.get('/pools/:tokenA/:tokenB', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Shards from blockchain ──
-app.get('/shards/:tokenA/:tokenB', async (req, res) => {
-  try {
-    const { tokenA, tokenB } = req.params;
-    const tA = tokens[tokenA], tB = tokens[tokenB];
-    if (!tA || !tB) return res.status(400).json({ error: 'Invalid token', tokens: Object.keys(tokens) });
-    await refreshOracle();
-    const fac = new ethers.Contract(deployment.contracts.factory,
-      ['function getShardsForPair(address,address) view returns (address[])'], provider);
-    const addrs = await fac.getShardsForPair(tA.address, tB.address);
-    if (addrs.length === 0) return res.status(404).json({ error: 'No shards' });
-    const sd = await Promise.all(addrs.map(async (a) => {
-      const pd = await getPoolData(a);
-      const liq = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1) +
-                  parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
-      return { address: a, name: findShardName(a), tokenA: pd.tokenA, tokenB: pd.tokenB,
-        reserveA: pd.reserveA, reserveB: pd.reserveB, liquidityUSD: Math.round(liq) };
-    }));
-    sd.sort((a, b) => a.liquidityUSD - b.liquidityUSD);
-    res.json({ tokenA, tokenB, shards: sd, totalShards: sd.length,
-      totalLiquidityUSD: sd.reduce((a, b) => a + b.liquidityUSD, 0) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// ── GET /quote/:tokenIn/:tokenOut/:amountOut  (also POST /quote) ─────────────
+// Returns detailed routing quote: best shard, fees, slippage, multi-hop path.
+async function buildQuoteResponse(tokenIn, tokenOut, amountOut) {
+  if (!RUST_BINARY_AVAILABLE) throw new Error('Rust binary not built — run: npm run rust:build');
+  const tIn  = deployment.tokens[tokenIn];
+  const tOut = deployment.tokens[tokenOut];
+  if (!tIn || !tOut) throw Object.assign(new Error('Invalid token'), { status: 400 });
 
-// ── GET /quote/:tokenIn/:tokenOut/:amountOut — quick quote with slippage ──
+  await refreshOracle();
+  const rawOut = parseUnits(amountOut, tOut.decimals);
+  const q      = await router.routeQuote(rawOut, tokenIn, tokenOut);
+
+  const amtIn  = parseFloat(formatUnits(q.amountIn, tIn.decimals));
+  const amtOut = parseFloat(amountOut);
+  const rate   = amtOut / amtIn;
+  const pxIn   = oraclePrices[tokenIn]  || tIn.price  || 1;
+  const pxOut  = oraclePrices[tokenOut] || tOut.price || 1;
+  const oracle = pxIn / pxOut;
+  const slip   = oracle > 0 ? ((rate - oracle) / oracle) * 100 : 0;
+
+  const totalFeeRaw = q.hopDetails.reduce((a, h) => a + Number(h.tradeFee), 0);
+  const totalFee    = parseFloat(formatUnits(BigInt(Math.ceil(totalFeeRaw)), tIn.decimals));
+
+  return {
+    tokenIn, tokenOut,
+    amountOut:        amtOut.toString(),
+    amountIn:         amtIn.toFixed(8),
+    amountInUSD:      (amtIn  * pxIn).toFixed(2),
+    amountOutUSD:     (amtOut * pxOut).toFixed(2),
+    effectiveRate:    rate.toFixed(8),
+    rateDescription:  `1 ${tokenOut} = ${(1/rate).toFixed(8)} ${tokenIn}`,
+    oracleRate:       oracle.toFixed(8),
+    slippagePct:      slip.toFixed(4),
+    totalFee:         totalFee.toFixed(8),
+    totalFeeUSD:      (totalFee * pxIn).toFixed(4),
+    totalFeeBps:      q.totalFeeBps,
+    priceImpactPct:   q.priceImpactPct,
+    routePath:        q.path,
+    hops:             q.hopDetails.length,
+    hopDetails:       q.hopDetails.map(h => ({
+      hop:            h.hop,
+      tokenIn:        h.tokenIn,
+      tokenOut:       h.tokenOut,
+      amountIn:       formatUnits(BigInt(h.amountIn), deployment.tokens[h.tokenIn]?.decimals || 6),
+      amountOut:      formatUnits(BigInt(h.amountOut), deployment.tokens[h.tokenOut]?.decimals || 6),
+      feeBps:         h.feeBps,
+      strategy:       h.strategy,
+      shardsUsed:     h.shardCount,
+      priceImpactPct: h.priceImpactPct,
+      legs:           h.legs.map(l => ({
+        shard:     l.shard,
+        amountIn:  formatUnits(BigInt(l.amountIn), deployment.tokens[h.tokenIn]?.decimals || 6),
+        amountOut: formatUnits(BigInt(l.amountOut), deployment.tokens[h.tokenOut]?.decimals || 6),
+      })),
+    })),
+    oraclePrices: { [tokenIn]: pxIn, [tokenOut]: pxOut },
+  };
+}
+
 app.get('/quote/:tokenIn/:tokenOut/:amountOut', async (req, res) => {
   try {
-    const { tokenIn, tokenOut, amountOut } = req.params;
-    const tIn = tokens[tokenIn], tOut = tokens[tokenOut];
-    if (!tIn || !tOut) return res.status(400).json({ error: 'Invalid token' });
-    await refreshOracle();
-
-    const hops = [{ tokenIn: tIn.address, tokenOut: tOut.address,
-      amountOut: ethers.parseUnits(amountOut, tOut.decimals) }];
-    const q = await router.quoteSwap(hops);
-
-    const amtIn = parseFloat(ethers.formatUnits(q.expectedAmountIn, tIn.decimals));
-    const amtOut = parseFloat(amountOut);
-    const fee = parseFloat(ethers.formatUnits(q.hopFees[0], tIn.decimals));
-    const feePct = (fee / amtIn) * 100;
-    const rate = amtOut / amtIn;
-    const oracle = (oraclePrices[tokenIn] || 1) / (oraclePrices[tokenOut] || 1);
-    const slip = ((rate - oracle) / oracle) * 100;
-    const usd = amtOut * (oraclePrices[tokenOut] || 1);
-
-    const amtInUSD = amtIn * (oraclePrices[tokenIn] || 1);
-    const feeUSD = fee * (oraclePrices[tokenIn] || 1);
-
-    res.json({
-      tokenIn, tokenOut, amountOut,
-      amountIn: amtIn.toFixed(8),
-      amountInUSD: amtInUSD.toFixed(2),
-      amountOutUSD: usd.toFixed(2),
-      effectiveRate: rate.toFixed(8),
-      rateDescription: `1 ${tokenOut} = ${(1 / rate).toFixed(8)} ${tokenIn}`,
-      oracleRate: oracle.toFixed(8),
-      oracleRateDescription: `1 ${tokenOut} = ${(1 / oracle).toFixed(8)} ${tokenIn} (CoinGecko)`,
-      slippagePct: slip.toFixed(4),
-      fee: fee.toFixed(8),
-      feeUSD: feeUSD.toFixed(4),
-      feePct: feePct.toFixed(4),
-      selectedShard: findShardName(q.selectedShards[0]),
-      selectedShardAddress: q.selectedShards[0],
-      priceImpact: `${(Number(q.priceImpacts[0]) / 10000).toFixed(2)}%`,
-      oraclePrices: { [tokenIn]: oraclePrices[tokenIn], [tokenOut]: oraclePrices[tokenOut] },
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const r = await buildQuoteResponse(req.params.tokenIn, req.params.tokenOut, req.params.amountOut);
+    res.json(r);
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
-// ── POST /quote — full quote (single or multi-hop) ──
 app.post('/quote', async (req, res) => {
   try {
-    const { tokenIn, tokenOut, route, amountOut } = req.body;
+    const { tokenIn, tokenOut, amountOut } = req.body;
     if (!amountOut) return res.status(400).json({ error: 'Missing: amountOut' });
-    await refreshOracle();
-
-    const routeArr = route && Array.isArray(route) ? route : [tokenIn, tokenOut];
-    if (routeArr.length < 2 || routeArr.some(t => !tokens[t]))
-      return res.status(400).json({ error: 'Invalid route', tokens: Object.keys(tokens) });
-
-    const hops = buildHops(routeArr, amountOut);
-    const q = await router.quoteSwap(hops);
-
-    const amtIn = parseFloat(ethers.formatUnits(q.expectedAmountIn, tokens[routeArr[0]].decimals));
-    const amtOut = parseFloat(amountOut);
-    const rate = amtOut / amtIn;
-    const oracle = (oraclePrices[routeArr[0]] || 1) / (oraclePrices[routeArr[routeArr.length - 1]] || 1);
-    const slip = ((rate - oracle) / oracle) * 100;
-
-    let totalFeeUSD = 0;
-    const hopDetails = [];
-    for (let i = 0; i < q.hopFees.length; i++) {
-      const f = parseFloat(ethers.formatUnits(q.hopFees[i], tokens[routeArr[i]].decimals));
-      totalFeeUSD += f * (oraclePrices[routeArr[i]] || 1);
-      hopDetails.push({
-        tokenIn: routeArr[i], tokenOut: routeArr[i + 1],
-        fee: f.toFixed(8), shard: findShardName(q.selectedShards[i]),
-        shardAddress: q.selectedShards[i],
-        priceImpact: `${(Number(q.priceImpacts[i]) / 10000).toFixed(2)}%`,
-      });
-    }
-
-    const amtInUSD = amtIn * (oraclePrices[routeArr[0]] || 1);
-    const amtOutUSD = amtOut * (oraclePrices[routeArr[routeArr.length - 1]] || 1);
-
-    res.json({
-      route: routeArr, amountOut, amountIn: amtIn.toFixed(8),
-      amountInUSD: amtInUSD.toFixed(2),
-      amountOutUSD: amtOutUSD.toFixed(2),
-      effectiveRate: rate.toFixed(8),
-      rateDescription: `1 ${routeArr[routeArr.length-1]} = ${(1/rate).toFixed(8)} ${routeArr[0]}`,
-      oracleRate: oracle.toFixed(8),
-      slippagePct: slip.toFixed(4),
-      totalFeeUSD: totalFeeUSD.toFixed(4),
-      feePctOfInput: ((totalFeeUSD / amtInUSD) * 100).toFixed(4),
-      hops: hopDetails,
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const r = await buildQuoteResponse(tokenIn, tokenOut, amountOut);
+    res.json(r);
+  } catch (e) { res.status(e.status || 500).json({ error: e.message }); }
 });
 
-// ── POST /swap — execute swap via router (requires wallet) ──
+// ── POST /swap — execute via on-chain atomic router ───────────────────────────
 app.post('/swap', async (req, res) => {
-  if (!wallet) return res.status(400).json({ error: 'No wallet — read-only mode' });
+  if (!keypair) return res.status(400).json({ error: 'No wallet — read-only mode' });
+  if (!PROGRAM_ID) return res.status(503).json({ error: 'Program not deployed' });
   try {
-    const { tokenIn, tokenOut, route, amountOut, slippagePct } = req.body;
+    const { tokenIn, tokenOut, amountOut, slippagePct = '1.0' } = req.body;
     if (!amountOut) return res.status(400).json({ error: 'Missing: amountOut' });
-    const slip = parseFloat(slippagePct || '1.0');
+    const tIn  = deployment.tokens[tokenIn];
+    const tOut = deployment.tokens[tokenOut];
+    if (!tIn || !tOut) return res.status(400).json({ error: 'Invalid token' });
 
-    const routeArr = route && Array.isArray(route) ? route : [tokenIn, tokenOut];
-    if (routeArr.length < 2 || routeArr.some(t => !tokens[t]))
-      return res.status(400).json({ error: 'Invalid route' });
+    const rawOut     = parseUnits(amountOut, tOut.decimals);
+    const slippageBps = BigInt(Math.round(parseFloat(slippagePct) * 100));
+    const quote      = await router.routeQuote(rawOut, tokenIn, tokenOut);
+    const sig        = await router.executeRoute(quote, slippageBps);
 
-    const hops = buildHops(routeArr, amountOut);
-    const q = await router.quoteSwap(hops);
-    const maxIn = q.expectedAmountIn * BigInt(Math.round(10000 + slip * 100)) / 10000n;
-
-    // Ensure approval
-    const tIn = tokens[routeArr[0]];
-    const routerAddr = deployment.contracts.router;
-    const allow = await tIn.contract.allowance(wallet.address, routerAddr);
-    if (allow < maxIn) {
-      const r = await txQueue.send(
-        (nonce) => tIn.contract.approve(routerAddr, ethers.MaxUint256, { nonce, gasLimit: 100_000 }),
-        `approve ${routeArr[0]}→router`
-      );
-      if (!r.success) return res.status(500).json({ error: `Approve failed: ${r.error}` });
-    }
-
-    // Execute
-    const result = await txQueue.send(
-      (nonce) => router.executeSwap(hops, maxIn, wallet.address, { nonce, gasLimit: 800_000 }),
-      `swap ${routeArr.join('→')}`
-    );
-    if (!result.success) return res.status(500).json({ error: result.error });
-
-    const amtIn = ethers.formatUnits(q.expectedAmountIn, tIn.decimals);
     res.json({
-      success: true, txHash: result.txHash, blockNumber: result.receipt.blockNumber,
-      route: routeArr, amountOut, amountIn: amtIn,
-      selectedShards: q.selectedShards.map(a => findShardName(a)),
-      gasUsed: result.receipt.gasUsed.toString(),
+      success:    true,
+      txHash:     sig,
+      tokenIn,    tokenOut, amountOut,
+      amountIn:   formatUnits(quote.amountIn, tIn.decimals),
+      routePath:  quote.path,
+      hops:       quote.hopDetails.length,
+      strategy:   quote.hopDetails.map(h => h.strategy).join('+'),
+      shardsUsed: quote.hopDetails.reduce((a, h) => a + h.shardCount, 0),
+      feeBps:     quote.totalFeeBps,
+      priceImpactPct: quote.priceImpactPct,
+      explorer:   `https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Price ──
+// ── GET /price/:tokenA/:tokenB ────────────────────────────────────────────────
 app.get('/price/:tokenA/:tokenB', async (req, res) => {
   try {
     const { tokenA, tokenB } = req.params;
-    const tA = tokens[tokenA], tB = tokens[tokenB];
+    const tA = deployment.tokens[tokenA];
+    const tB = deployment.tokens[tokenB];
     if (!tA || !tB) return res.status(400).json({ error: 'Invalid token' });
-
-    const shards = deployment.contracts.shards[`${tokenA}-${tokenB}`] ||
-                   deployment.contracts.shards[`${tokenB}-${tokenA}`];
-    if (!shards?.length) return res.status(404).json({ error: 'No pool' });
-
-    const pool = new ethers.Contract(shards[shards.length - 1].address, POOL_ABI, provider);
-    const oneUnit = ethers.parseUnits('1', tB.decimals);
-    const q = await pool.calculateSwapSAMM(oneUnit, tA.address, tB.address);
-    const price = ethers.formatUnits(q.amountIn, tA.decimals);
-
     await refreshOracle();
-    const oracleRate = (oraclePrices[tokenA] || 1) / (oraclePrices[tokenB] || 1);
-    const spotRate = parseFloat(price);
-    const deviation = ((spotRate - oracleRate) / oracleRate * 100);
-    const spotPriceUSD = oraclePrices[tokenB] || 1;
+
+    // Use the router to quote 1 unit of tokenB
+    const rawOut = parseUnits('1', tB.decimals);
+    const q = await router.routeQuote(rawOut, tokenA, tokenB);
+    const price  = parseFloat(formatUnits(q.amountIn, tA.decimals));
+    // oracle = "how much tokenA per 1 tokenB" = tokenB_usd / tokenA_usd
+    const oracle = (oraclePrices[tokenB] || tB.price || 1) / (oraclePrices[tokenA] || tA.price || 1);
+    const deviation = oracle > 0 ? ((price - oracle) / oracle) * 100 : 0;
 
     res.json({
-      pair: `${tokenA}/${tokenB}`,
-      price,
-      description: `1 ${tokenB} = ${price} ${tokenA}`,
-      spotPriceUSD: spotPriceUSD.toFixed(2),
-      oracleRate: oracleRate.toFixed(8),
+      pair:         `${tokenA}/${tokenB}`,
+      price:        price.toFixed(8),
+      description:  `1 ${tokenB} = ${price.toFixed(8)} ${tokenA}`,
+      oracleRate:   oracle.toFixed(8),
       deviationPct: deviation.toFixed(4),
-      pool: shards[shards.length - 1].name,
-      poolAddress: shards[shards.length - 1].address,
-      oraclePrices: { [tokenA]: oraclePrices[tokenA], [tokenB]: oraclePrices[tokenB] },
+      routePath:    q.path,
+      feeBps:       q.totalFeeBps,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -472,23 +410,37 @@ app.get('/price/:tokenA/:tokenB', async (req, res) => {
 app.get('/balance/:address/:token', async (req, res) => {
   try {
     const { address, token } = req.params;
-    if (!ethers.isAddress(address)) return res.status(400).json({ error: 'Invalid address' });
-    const t = tokens[token];
+    const t = deployment.tokens[token];
     if (!t) return res.status(400).json({ error: 'Invalid token' });
-    const bal = await t.contract.balanceOf(address);
-    res.json({ address, token, balance: ethers.formatUnits(bal, t.decimals), balanceRaw: bal.toString() });
+
+    const { getAssociatedTokenAddressSync } = require('@solana/spl-token');
+    const { PublicKey } = require('@solana/web3.js');
+    const { getTokenBalance } = require('./solana-client');
+
+    const userPk = new PublicKey(address);
+    const mintPk = new PublicKey(t.mint);
+    const ata = getAssociatedTokenAddressSync(mintPk, userPk);
+    const bal = await getTokenBalance(connection, ata);
+
+    res.json({ address, token, balance: formatUnits(bal.amount, t.decimals), balanceRaw: bal.amount.toString() });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/balances/:address', async (req, res) => {
   try {
     const { address } = req.params;
-    if (!ethers.isAddress(address)) return res.status(400).json({ error: 'Invalid address' });
+    const { getAssociatedTokenAddressSync } = require('@solana/spl-token');
+    const { PublicKey } = require('@solana/web3.js');
+    const { getTokenBalance } = require('./solana-client');
+
+    const userPk = new PublicKey(address);
     const bals = {};
-    for (const [sym, t] of Object.entries(tokens)) {
-      const bal = await t.contract.balanceOf(address);
-      bals[sym] = { balance: ethers.formatUnits(bal, t.decimals), balanceRaw: bal.toString(),
-        decimals: t.decimals, address: t.address };
+    for (const [sym, t] of Object.entries(deployment.tokens)) {
+      try {
+        const ata = getAssociatedTokenAddressSync(new PublicKey(t.mint), userPk);
+        const b   = await getTokenBalance(connection, ata);
+        bals[sym] = { balance: formatUnits(b.amount, t.decimals), balanceRaw: b.amount.toString(), decimals: t.decimals, mint: t.mint };
+      } catch { bals[sym] = { balance: '0', balanceRaw: '0', decimals: t.decimals, mint: t.mint }; }
     }
     res.json({ address, balances: bals });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -500,31 +452,31 @@ app.get('/stats', async (req, res) => {
     await refreshOracle();
     let totalLiq = 0;
     const pairStats = {};
-    for (const [pair, shards] of Object.entries(deployment.contracts.shards)) {
+    for (const [pair, shards] of Object.entries(deployment.pools)) {
       let pairLiq = 0;
       for (const s of shards) {
-        const pd = await getPoolData(s.address);
-        const l = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1) +
-                  parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
-        pairLiq += l;
+        try {
+          const pd = await getPoolData(s.address);
+          const l  = parseFloat(pd.reserveA) * (oraclePrices[pd.tokenA] || 1)
+                   + parseFloat(pd.reserveB) * (oraclePrices[pd.tokenB] || 1);
+          pairLiq += l;
+        } catch { /* skip */ }
       }
       totalLiq += pairLiq;
-      pairStats[pair] = { shards: shards.length, liquidityUSD: Math.round(pairLiq),
-        shardNames: shards.map(s => s.name) };
+      pairStats[pair] = { shards: shards.length, liquidityUSD: Math.round(pairLiq) };
     }
     res.json({
-      totalPairs: Object.keys(deployment.contracts.shards).length,
-      totalShards: Object.values(deployment.contracts.shards).reduce((s, a) => s + a.length, 0),
+      network: deployment.network,
+      programId: PROGRAM_ID || null,
+      totalPairs: Object.keys(deployment.pools).length,
+      totalShards: Object.values(deployment.pools).reduce((s, a) => s + a.length, 0),
       totalLiquidityUSD: Math.round(totalLiq),
-      pairs: pairStats, tokens: Object.keys(tokens).length,
-      router: deployment.contracts.router, factory: deployment.contracts.factory,
-      orchestrator: deployment.contracts.orchestrator || null,
-      oraclePrices,
+      pairs: pairStats, tokens: Object.keys(deployment.tokens).length, oraclePrices,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── Arbitrage Bot ──────────────────────────────────────────────
+// ── Arbitrage Bot ──
 app.get('/arbitrage/status', (req, res) => {
   if (!arbitrageBot) return res.json({ enabled: false });
   res.json(arbitrageBot.getStatus());
@@ -532,16 +484,17 @@ app.get('/arbitrage/status', (req, res) => {
 
 app.get('/arbitrage/history', (req, res) => {
   if (!arbitrageBot) return res.json({ enabled: false, history: [] });
-  const limit = parseInt(req.query.limit || '50');
-  const pair = req.query.pair || undefined;
+  const limit  = parseInt(req.query.limit || '50');
+  const pair   = req.query.pair || undefined;
   const status = req.query.status || undefined;
   res.json({ history: arbitrageBot.getHistory(limit, { pair, status }) });
 });
 
 app.post('/arbitrage/start', async (req, res) => {
-  if (!wallet) return res.status(400).json({ error: 'No PRIVATE_KEY' });
+  if (!keypair) return res.status(400).json({ error: 'No SOLANA_PRIVATE_KEY' });
+  if (!PROGRAM_ID) return res.status(503).json({ error: 'Program not deployed yet' });
   if (!arbitrageBot) {
-    arbitrageBot = new ArbitrageBot(DEPLOYMENT_FILE, normalizePK(process.env.PRIVATE_KEY), RPC_URL, txQueue);
+    arbitrageBot = new ArbitrageBot(DEPLOYMENT_FILE, keypair, connection, txQueue, PROGRAM_ID);
   }
   try { await arbitrageBot.start(); res.json({ success: true, status: arbitrageBot.getStatus() }); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -553,16 +506,16 @@ app.post('/arbitrage/stop', (req, res) => {
   res.json({ success: true, status: arbitrageBot.getStatus() });
 });
 
-// ─── Dynamic Shard Manager ─────────────────────────────────────
+// ── Dynamic Shard Manager ──
 app.get('/sharding/status', (req, res) => {
   if (!shardManager) return res.json({ enabled: false });
   res.json(shardManager.getStatus());
 });
 
 app.post('/sharding/start', async (req, res) => {
-  if (!wallet) return res.status(400).json({ error: 'No PRIVATE_KEY' });
+  if (!keypair) return res.status(400).json({ error: 'No SOLANA_PRIVATE_KEY' });
   if (!shardManager) {
-    shardManager = new DynamicShardManager(DEPLOYMENT_FILE, normalizePK(process.env.PRIVATE_KEY), RPC_URL, txQueue);
+    shardManager = new DynamicShardManager(DEPLOYMENT_FILE, keypair, connection, txQueue, PROGRAM_ID);
   }
   try { await shardManager.start(); res.json({ success: true, status: shardManager.getStatus() }); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -580,34 +533,159 @@ app.post('/sharding/check', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Rust SAMM Math Verification ──
+app.get('/verify-swap', (req, res) => {
+  if (!RUST_BINARY_AVAILABLE) {
+    return res.status(503).json({ error: 'Rust binary not built. Run: npm run rust:build' });
+  }
+
+  const { amountOut, sourceReserve, destReserve, formula } = req.query;
+  if (!amountOut || !sourceReserve || !destReserve) {
+    return res.status(400).json({
+      error: 'Required query params: amountOut, sourceReserve, destReserve',
+      example: '/verify-swap?amountOut=1000&sourceReserve=100000&destReserve=100000',
+    });
+  }
+
+  const output_amount  = Number(amountOut);
+  const source_reserve = Number(sourceReserve);
+  const dest_reserve   = Number(destReserve);
+
+  if ([output_amount, source_reserve, dest_reserve].some(v => !Number.isInteger(v) || v <= 0)) {
+    return res.status(400).json({ error: 'amountOut, sourceReserve, destReserve must be positive integers' });
+  }
+
+  try {
+    const result = { output_amount, source_reserve, dest_reserve };
+
+    if (!formula || formula === 'samm') {
+      result.rust_samm = rustCall('swap-samm', {
+        output_amount, source_reserve, dest_reserve,
+        trade_fee_num: 25, trade_fee_denom: 10000,
+        owner_fee_num: 0,  owner_fee_denom: 1,
+      });
+    }
+    if (!formula || formula === 'paper') {
+      result.rust_paper = rustCall('swap-samm-paper', {
+        output_amount, source_reserve, dest_reserve,
+        owner_fee_num: 0, owner_fee_denom: 1,
+      });
+    }
+    if (result.rust_samm && result.rust_paper) {
+      result.base_swap_matches = result.rust_samm.source_amount_swapped === result.rust_paper.source_amount_swapped;
+    }
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── POST /faucet — mint test tokens to any wallet ────────────────────────────
+// Body: { address: "<base58>", tokens?: { USDC: 1000, USDT: 500, ... } }
+// Default amounts: 1000 USDC/USDT/DAI, 0.5 WETH (500000000 raw), 0.01 WBTC (1000000 raw)
+const FAUCET_DEFAULTS = { USDC: 1000, USDT: 1000, DAI: 1000, WETH: 0.5, WBTC: 0.01 };
+const FAUCET_MAX      = { USDC: 10000, USDT: 10000, DAI: 10000, WETH: 5, WBTC: 0.1 };
+
+app.post('/faucet', async (req, res) => {
+  if (!keypair) return res.status(400).json({ error: 'No wallet — faucet unavailable in read-only mode' });
+
+  const { address, tokens: requested } = req.body;
+  if (!address) return res.status(400).json({ error: 'Missing: address' });
+
+  const {
+    PublicKey, Transaction, sendAndConfirmTransaction,
+  } = require('@solana/web3.js');
+  const {
+    getAssociatedTokenAddressSync,
+    createAssociatedTokenAccountIdempotentInstruction,
+    mintTo,
+  } = require('@solana/spl-token');
+
+  let recipient;
+  try { recipient = new PublicKey(address); }
+  catch { return res.status(400).json({ error: 'Invalid address' }); }
+
+  const amounts = requested || FAUCET_DEFAULTS;
+  const results = {};
+
+  for (const [sym, humanAmt] of Object.entries(amounts)) {
+    const t = deployment.tokens[sym];
+    if (!t?.mint) { results[sym] = { error: 'Unknown token' }; continue; }
+
+    const cap = FAUCET_MAX[sym] || 10000;
+    const clamped = Math.min(Number(humanAmt), cap);
+    const rawAmt  = BigInt(Math.round(clamped * 10 ** t.decimals));
+    if (rawAmt <= 0n) { results[sym] = { error: 'Amount must be positive' }; continue; }
+
+    try {
+      const mintPk = new PublicKey(t.mint);
+      const ata    = getAssociatedTokenAddressSync(mintPk, recipient);
+
+      // Ensure ATA exists (idempotent)
+      const ensureTx = new Transaction().add(
+        createAssociatedTokenAccountIdempotentInstruction(keypair.publicKey, ata, recipient, mintPk),
+      );
+      await sendAndConfirmTransaction(connection, ensureTx, [keypair], { commitment: 'confirmed' });
+
+      // Mint
+      const sig = await mintTo(connection, keypair, mintPk, ata, keypair, rawAmt);
+
+      results[sym] = {
+        amount: clamped.toString(),
+        amountRaw: rawAmt.toString(),
+        ata: ata.toBase58(),
+        txHash: sig,
+        explorer: `https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      };
+    } catch (e) {
+      results[sym] = { error: e.message?.slice(0, 100) };
+    }
+  }
+
+  const succeeded = Object.values(results).filter(r => r.txHash).length;
+  res.json({
+    success: succeeded > 0,
+    address,
+    minted: succeeded,
+    total: Object.keys(results).length,
+    results,
+  });
+});
+
 // ── Error handler ──
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// ─── Start ──────────────────────────────────────────────────────
+// ─── Start ────────────────────────────────────────────────────────
 initialize().then(() => {
   app.listen(PORT, () => {
-    console.log(`\n🚀 SAMM DEX API Server on port ${PORT}`);
+    console.log(`\n🚀 SAMM DEX API Server — Solana — port ${PORT}`);
+    console.log(`   Network:   ${RPC_URL}`);
+    console.log(`   Program:   ${PROGRAM_ID || '(not deployed)'}`);
     console.log(`\n📚 Endpoints:`);
     console.log(`   GET  /health                          — health + status`);
     console.log(`   GET  /tokens                          — tokens with prices`);
     console.log(`   GET  /pools                           — all pools with TVL`);
     console.log(`   GET  /pools/:tokenA/:tokenB           — pools for pair`);
-    console.log(`   GET  /shards/:tokenA/:tokenB          — shards from chain`);
-    console.log(`   GET  /quote/:tokenIn/:tokenOut/:amt   — quick quote + slippage`);
+    console.log(`   GET  /quote/:tokenIn/:tokenOut/:amt   — quick quote`);
     console.log(`   POST /quote                           — full quote (multi-hop)`);
-    console.log(`   POST /swap                            — execute swap via router`);
+    console.log(`   POST /swap                            — execute swap`);
     console.log(`   GET  /price/:tokenA/:tokenB           — spot price`);
     console.log(`   GET  /balance/:addr/:token            — token balance`);
     console.log(`   GET  /balances/:addr                  — all balances`);
     console.log(`   GET  /stats                           — DEX statistics`);
     console.log(`   GET  /arbitrage/status                — arb bot status`);
-    console.log(`   GET  /arbitrage/history?limit=50      — arb swap log`);
+    console.log(`   GET  /arbitrage/history               — arb swap log`);
     console.log(`   POST /arbitrage/start|stop            — control arb bot`);
     console.log(`   GET  /sharding/status                 — shard manager status`);
     console.log(`   POST /sharding/start|stop|check       — control shard manager`);
+    console.log(`   GET  /verify-swap?amountOut=&sourceReserve=&destReserve=`);
+    console.log(`   POST /faucet                           — mint test tokens to any wallet`);
+    if (!RUST_BINARY_AVAILABLE) {
+      console.log(`\n⚠️  Rust binary not found — run: npm run rust:build`);
+    }
     console.log(`\n💡 curl http://localhost:${PORT}/health\n`);
   });
-}).catch(err => { console.error('Failed:', err); process.exit(1); });
+}).catch(err => { console.error('Startup failed:', err); process.exit(1); });

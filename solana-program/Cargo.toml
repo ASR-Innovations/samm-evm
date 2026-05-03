@@ -1,0 +1,27 @@
+[package]
+name = "spl-token-swap"
+version = "3.0.0"
+description = "SAMM — Stableswap AMM on Solana (ported from spl-samm)"
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+no-entrypoint = []
+production = []
+
+[dependencies]
+arrayref = "0.3.7"
+enum_dispatch = "0.3.13"
+num-derive = "0.4"
+num-traits = "0.2"
+solana-program = "2.0.0"
+spl-math = { version = "0.3", features = ["no-entrypoint"] }
+spl-token = { version = "6.0", features = ["no-entrypoint"] }
+spl-token-2022 = { version = "4.0", features = ["no-entrypoint"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+solana-sdk = "2.0.0"
+
+[lib]
+crate-type = ["cdylib", "lib"]

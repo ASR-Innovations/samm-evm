@@ -1,0 +1,420 @@
+{
+  "_comment": "Populated by scripts/deploy-solana.js and scripts/initialize-pools.js",
+  "network": "devnet",
+  "programId": "AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ",
+  "deployedAt": "2026-05-03T00:00:00.000Z",
+  "tokens": {
+    "USDC": {
+      "mint": "8NYkWmgtd5Sd2YfitVoQviWNY8wtDXTuH4bykDP3yZKM",
+      "decimals": 6,
+      "price": 1
+    },
+    "USDT": {
+      "mint": "5MVkBousJgvBwynVCw8oqAb5vNoyVaB59MGMRybLmpW7",
+      "decimals": 6,
+      "price": 1
+    },
+    "WETH": {
+      "mint": "CC9VEegiHtEet2LXWoLWwt1QdEjPFgBtwLDAxnB6xVk7",
+      "decimals": 9,
+      "price": 3000
+    },
+    "WBTC": {
+      "mint": "yhD6NWN78cZSZcbfiyVrvBMSDjQEiEnDEc2PgFdURku",
+      "decimals": 8,
+      "price": 65000
+    },
+    "DAI": {
+      "mint": "7EPCJuQFajxDQzbhA7LKmCsZfr4H43a6GX5oULQjdpNs",
+      "decimals": 9,
+      "price": 1
+    }
+  },
+  "pools": {
+    "USDC-USDT": [
+      {
+        "address": "AaCzwwGiuBUaLwyj6ComyMBWWhfLZwGncCUdhzpcsTGT",
+        "name": "USDC-USDT-Small",
+        "liquidityUSD": 100000,
+        "tokenAccountA": "H91SMfmq1u7chbMLJtR6fG168actvt649p3fFgvWf8wL",
+        "tokenAccountB": "7R4udYrc6q2LS4s31z9JER3nsCSBGfMc3aZncHRQS2yV",
+        "poolMint": "8jzLomJeKzQsnnRnRAiMGaDDsAfYnSFtSJTjfo5nsi5M",
+        "feeAccount": "U7GzBhfPiQraH7ARDPoP12U9uATVXWxGGHWRUVJqr94",
+        "authority": "6B28WD2F2c2J6178fiitcvSpP6KozyXsQVDFjKSK1sHv",
+        "createdAt": "2026-05-02T19:03:00.785Z"
+      },
+      {
+        "name": "USDC-USDT-Medium",
+        "address": "HYcqqLeofeuJHYJivnSbJegGX2dS13ifxxW5S5CF6Rnd",
+        "authority": "6NE7VDw1Z9MsYzM8dy6tHSgwfRtBFz8fASkJEczHQ3We",
+        "bumpSeed": 253,
+        "tokenAccountA": "HLRdVM7ej1Uui4pTVM9MwtQd78KNqEiRZvS5CcAW7JPj",
+        "tokenAccountB": "AzFjRkA9GXstpPkXj84tqUVARZybrPV8jatStc6MxrFZ",
+        "poolMint": "5vd2dmMqreKaDtnEafnEFxbPDfbVQCfCWXE8SHnBLrA",
+        "feeAccount": "4NmMviWRRuD3ugbhhTXoehvz9DcyniXK4KQQGQm9wPKe",
+        "liquidityUSD": 100000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:05:22.853Z"
+      },
+      {
+        "name": "USDC-USDT-Large",
+        "address": "7ypNMju4UcwA4hQYUkNm3vv62a6uzNA8vggMeg19Xzmr",
+        "authority": "GasQTVhRYzCznhZZwvvLj5YF1hCrehDQ5T3JD7dmwMAo",
+        "bumpSeed": 252,
+        "tokenAccountA": "FkR5eo9nXG4ytW2F2GF6axtHe8ekBfo71UqNvA5pHCwp",
+        "tokenAccountB": "6nWz6xJ7wAxakKcmdcvHmS3Ry7iz7vxsLC4gaRU8KBSJ",
+        "poolMint": "8Ncy99tDNt2SQMTNordu2ts3mX7tCzj9siYPEK9Sxen7",
+        "feeAccount": "5jBoJXgZATZUmTDSwChhKvQT5KpmEbCRoFoUDonhyeo5",
+        "liquidityUSD": 400000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:05:32.945Z"
+      },
+      {
+        "name": "USDC-USDT-XL",
+        "address": "BxgLJLZSYVdHJ9LQ2kgKBNnsgmQmL44eU6qJ2PyJ9J72",
+        "authority": "9U2dpSsr5WTm894PZpmdXoDVk2FmatBc1ktp4he5jg3n",
+        "bumpSeed": 255,
+        "tokenAccountA": "DVRerjX3c1obzHEAHN1UMvM7qiN7UNkHYfM111Uti8ai",
+        "tokenAccountB": "142EPzKJvzV6FBYKjCkk4mEUyomauHMKY6mfJ6NnCU8R",
+        "poolMint": "4kzJiVfVpxz9WAUaWKzS2kmLe8G1msUM6xCUgHefx983",
+        "feeAccount": "9nk1HoVnYYKTWn3PU9TWbYK4zu5TmC8fLnTRerD75jtC",
+        "liquidityUSD": 2000000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:05:42.414Z"
+      }
+    ],
+    "WETH-USDC": [
+      {
+        "address": "4VkjGLszvjZ1C2YVCA3gvALfhW2meLquLDao1K3huCV2",
+        "name": "WETH-USDC-Small",
+        "liquidityUSD": 100000,
+        "tokenAccountA": "47EztojabLKA95UB9rSsecK2Up1ZkjRenXnJrzT2nUXD",
+        "tokenAccountB": "CsUfrv8oVp6hvJrPWZoQUWf6gWA5PG9MrfZN447g6nL",
+        "poolMint": "9fGEMsECCC9UjMfnZcZCvrPdo15fSx1Y5NaN74tSzyzB",
+        "feeAccount": "6nxbJ3xVo8jf2cAntdECvZurMeJMibmJXZyEPDEffSP4",
+        "authority": "9SMQmdxNtcFJMQcANteEbGcz9YKocCkxh6cK8J4oVrLi",
+        "createdAt": "2026-05-02T19:03:12.083Z"
+      },
+      {
+        "name": "WETH-USDC-Medium",
+        "address": "JBatFMGXjapf4sHfhWdnWC25irQ8S6Gu72oUCt7zTRsD",
+        "authority": "7zoHyo1JH17z7sa8tJiCxuywbAgnW2ikMf8MmyFiecZW",
+        "bumpSeed": 254,
+        "tokenAccountA": "3nK3mYZYz4kETwirdQSsjcTTFiZCo4TZbWyFQsKbRX3b",
+        "tokenAccountB": "HrXgZB3yafhFaxqJTYECwUm3UYeCb7itKxtw3cVCpiV1",
+        "poolMint": "2CSkfNrKBXZYHTGos7LU4Yh5EsZYoMK2qvV26DrPU6bw",
+        "feeAccount": "9HQhSoDsscHp2Ex11s9UWiEkARJJwUQsZk2grMUSPRzm",
+        "liquidityUSD": 100000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:07:08.692Z"
+      },
+      {
+        "name": "WETH-USDC-Large",
+        "address": "AJLUAP8VXBmCovsjq1r1H8KoqqJ6xYwsGAQV4TD6Wdgf",
+        "authority": "75bd6aXWh9uQWyP835ijwSs9AsRiTfXpM99qHrZa8hMe",
+        "bumpSeed": 255,
+        "tokenAccountA": "CvMzN69Pu1fgedFZeYCGrqYHadYZcHxNCnkYdfEDARWV",
+        "tokenAccountB": "qhVUHaHWkjT1Kp1bGGWR5FSmi9qFbAD6eBtGSKSS15d",
+        "poolMint": "917dEUb2sDVxBgAMZJwo1aH3mFKgc244WwU8Tt9uLjfT",
+        "feeAccount": "GVtBMQbz3j7caGK89p2n8wfjyhmWuTTH2Pjcs5DX4SNK",
+        "liquidityUSD": 400000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:07:19.427Z"
+      },
+      {
+        "name": "WETH-USDC-XL",
+        "address": "4faBmJPGPjHCdt3GMy57fjJwDmsU5GbaWjqJ3Tk9timp",
+        "authority": "FBFVazNkjMUT1cALTLr5mM549NR5WUGcc2ezsvK36mnA",
+        "bumpSeed": 255,
+        "tokenAccountA": "CPDz6oGzbkX5VQrFmRYvou2RX2N3QzeMKxnDpZHhGMMq",
+        "tokenAccountB": "2JZ8kFqU12BA5eptNuQs3iAa8fRC87q4pHGisiDBpsTw",
+        "poolMint": "4xpfwcv7sbueqqahrtuTqf7yRomrQArjrBCGHaEGnuev",
+        "feeAccount": "Hrb1iVxrbWfCcn9m7thow3mJ5s1YsiQNUPRVchA44NWR",
+        "liquidityUSD": 2000000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:07:29.758Z"
+      }
+    ],
+    "WBTC-USDC": [
+      {
+        "address": "BonBFDPxAGY1zCdNsUAb2sgm6AReTc63Cpqh7jRopDzx",
+        "name": "WBTC-USDC-Small",
+        "liquidityUSD": 100000,
+        "tokenAccountA": "5PUAwTpZjoZiXxEb2B969ufwk81VJvEHHd3sw2VmFNFZ",
+        "tokenAccountB": "GSse8c6cHSkvvKYEDF9RCouy8MkyrR4YDyEFicJvY6cA",
+        "poolMint": "G3JB6cdCkcxasJAABbhdzUenMS42n4SrGnyg91NH6EKM",
+        "feeAccount": "Aw1XdxVGcFeSU78VkRpL5jcoM7qJQBcnvFntjfom8Cd5",
+        "authority": "8gknqP6ssnvyQupBYDFTbDNBozGJbZHEHdino1X3zVV8",
+        "createdAt": "2026-05-02T19:03:23.143Z"
+      },
+      {
+        "name": "WBTC-USDC-Medium",
+        "address": "8ZGE1QBDFRMBuj1ZXABnzxpSD8CwUt9KqUzoMcy4SYkB",
+        "authority": "FnRRfBHWWJo1U9HiMXZGu2DzhSf4ogddkte24tzcgfrA",
+        "bumpSeed": 255,
+        "tokenAccountA": "7LXCEDw74qFU5mFAVEJvVRvmz7Ub5tkSeC6XaZa8K2Mg",
+        "tokenAccountB": "E53PFT2fY4oEmqbrhYXRWqjZeFKRLWiDy6Pxe2HogoTn",
+        "poolMint": "D9jK6kXapq14u6asCMt6soCNnscjF7gMjr1SwhP54RXL",
+        "feeAccount": "3xuWHJdKmBfGkojp5tpC8jGNxRBB7NnQLtv8VmebnGU5",
+        "liquidityUSD": 100000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:07:39.389Z"
+      },
+      {
+        "name": "WBTC-USDC-Large",
+        "address": "6wnREvxGMUESf5eNhBxiqGBf8x7BkpT9EDHYsjvdQW77",
+        "authority": "8vsh8KXg9QGGYzTJpnKCibmUMZQe7QkaRZqDpy46oCSk",
+        "bumpSeed": 255,
+        "tokenAccountA": "ERVCLy9zw63EJxdRq2jDcCm2WLWcrn4687VpmXkjAfas",
+        "tokenAccountB": "CGhqTeppaLmCxmZ3UmLW9kkqkjoT1d7RRH2dzdQPeZBA",
+        "poolMint": "4fW2tS34DbMGYfRJrdMvgGv4sosFw3z1jMAqkwCWCEVX",
+        "feeAccount": "3QvyC3NEzih1fTjWgekygeYhRoAyc53QMvumUrHdAfGZ",
+        "liquidityUSD": 400000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:07:49.492Z"
+      },
+      {
+        "name": "WBTC-USDC-XL",
+        "address": "4S2HJ7nYYNYu2uU5YphReYvnWwgdDy6cufngR1xoNpaV",
+        "authority": "EALMGJ2WRffADB39hA6Nx98FDZ1BK1AUsatrBPabsiih",
+        "bumpSeed": 255,
+        "tokenAccountA": "HVyKnA3gzSSBTKBpuzdWXjCv2FdTTuMnepRHFXcw1a7i",
+        "tokenAccountB": "ED2BVbkZ8SP9tTwM4P28HSmVcUdRhDzRR5cyHoo8Ewyg",
+        "poolMint": "4hqgN97ny2MXCeS2vYXsq5uJieXAGimSXGoG9HWptrVu",
+        "feeAccount": "C8oTiwYZmt2nv1tBUVAGSj6qupBDVDk3RfonRyWm3Efh",
+        "liquidityUSD": 2000000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:07:59.849Z"
+      }
+    ],
+    "DAI-USDC": [
+      {
+        "address": "ExaWxELZ3yKvq685txS7nCYE5thtZphLGCXFWobENUoN",
+        "name": "DAI-USDC-Small",
+        "liquidityUSD": 100000,
+        "tokenAccountA": "3L2wqEgTx1THxEGj4ZoAfVv5VcGvJ4BiHifHYjzng6dZ",
+        "tokenAccountB": "HwDgvK6oHteQRNgfQXxf6j5wdfwoedAdHxYc8ZBzxMVm",
+        "poolMint": "J3re5rQhBetZTXZMHcbQ8HZMBriFgsWTSvFrcTv6RkzJ",
+        "feeAccount": "6CFf4U2oBLZbdrh96gPuFHicTiwGGoWDGaefajVvfCKj",
+        "authority": "2fDyvgGZPKq866whhn4rkwsG2b9LUwaAxyJXPiHJ8T24",
+        "createdAt": "2026-05-02T19:03:33.565Z"
+      }
+    ],
+    "USDC-DAI": [
+      {
+        "name": "USDC-DAI-Small",
+        "address": "A9tqtkjUCVnrWZ6Am5N7KCJ1kJsnpu6YXD1nSuzb1ETk",
+        "authority": "BUBMZBvcVKCzBW7v2tZUAqpvu7CZNf2FvRgQ9AYZWzma",
+        "bumpSeed": 255,
+        "tokenAccountA": "UQdP8JXdrtBffPka7AVZehhY3WjE1q8uzHq2GuCbWf3",
+        "tokenAccountB": "7CCBNTLQJq3xd78ad9Gi8GtXMzvtRLCCdu5mjaJV9RDZ",
+        "poolMint": "5QiLijdrvGpPh4pLfaFoHgFCjLintziaLdn2UD9xPWs9",
+        "feeAccount": "2anZoQrUz2865qW1wtvyorr64KmNQ7vTaWSnqnNUYG3w",
+        "liquidityUSD": 20000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:05:51.647Z"
+      },
+      {
+        "name": "USDC-DAI-Medium",
+        "address": "GVdCMkMjhcuJcuBBpfohTVNGHLvvkKHf4DxhR1EgpTwP",
+        "authority": "7MRqmRFjx7krnkZk9cVqSYbyJrorAp8AKQXMknA5qDKv",
+        "bumpSeed": 255,
+        "tokenAccountA": "3vwQnyLLy9Y1AfZaPob6SzUDwzHTiyrempty5Gmv21Rw",
+        "tokenAccountB": "Ap2MgZXprrpcHf3kp9zeB5MFeuyZpRd9XyCt71ZHme96",
+        "poolMint": "7kLUSMUPAT5iTZEnECqrTHUfhH18ZJsaLSUECgEgVXfb",
+        "feeAccount": "GRcQeR6Nwq46fJvkENUQdBQXhGd9X9pFibN55dhwnVs",
+        "liquidityUSD": 100000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:00.947Z"
+      },
+      {
+        "name": "USDC-DAI-Large",
+        "address": "AK71KtZcSEv8ajtoYkHqVY55bAoJAyyQyTqN6r8Qpx8e",
+        "authority": "4WzP6LzyatZ3wJjkpT34ZspLKKS8ZtMTcTmDD1VCHQiK",
+        "bumpSeed": 255,
+        "tokenAccountA": "CVcT1EqKegfj52KkTHpoJsSPdLaAtSgLAD1GGRoeVHNR",
+        "tokenAccountB": "44t81RUErGhNSNbaeWZcF2Sp9NQjKiQgGQ3CAJL6GLPc",
+        "poolMint": "32WC4cneoCi96mupXsSZPAU2VLBRk6jBb8C5DPcvnLQQ",
+        "feeAccount": "hvZn9DCLAmWuc5gP8D5SRcaHMnD8ntFdBqzmdsvhYVk",
+        "liquidityUSD": 400000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:09.907Z"
+      },
+      {
+        "name": "USDC-DAI-XL",
+        "address": "BMnBcRpkYcNqKe41qL2j5rLq6FTJRnVmJfdg18zJJPED",
+        "authority": "4vX3rHiUSF54TJpQzXkn8wKc6fFkVeDJ76JUXd5MF8Nk",
+        "bumpSeed": 254,
+        "tokenAccountA": "2fw4LH6qa6s9yQQEFtcJQL8mcxsVAW6FHnwqboCW9ExN",
+        "tokenAccountB": "7ewQgvoDiJseVXHG8QGgccHTc93qrsHEM7SquUVHqxPd",
+        "poolMint": "kVrnf8ZBgNXcgc1Y11R6woj8R6zT3xVCUYJN4HzoDkD",
+        "feeAccount": "BaLhF87pUp1RQfWKk7CAJmvXw2kWpRQoCGTHKNtsWAvc",
+        "liquidityUSD": 2000000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:19.742Z"
+      }
+    ],
+    "USDT-DAI": [
+      {
+        "name": "USDT-DAI-Small",
+        "address": "HFfjnASbjoxB33GFRt6Am8Z5ne4RPoQLYmaRCb9A4gH",
+        "authority": "G2vse81twh4yP9mUkvVXp12N6ASuPudfzFvtGjiK43tF",
+        "bumpSeed": 255,
+        "tokenAccountA": "9jWRTqgmjh4XrHwYaJ6RNRtZpkN4fF1JupLMHgmramfp",
+        "tokenAccountB": "3md6YMksWYswfJ8PJmRfhYS44PT2xRGMCadKcmHgoL2b",
+        "poolMint": "YCueZuJPsGm6VioRZTTQcmZ5NXAb2Lf8wVVowDKcFQe",
+        "feeAccount": "8FDKcrvwKTHHek7uN1GqpnrAXzaLj9FKdR3Fvnof87RC",
+        "liquidityUSD": 20000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:28.798Z"
+      },
+      {
+        "name": "USDT-DAI-Medium",
+        "address": "4nBZRd6mex85nLRVfNg5zcH7rey3qpqkf6r1LtB7Uf5R",
+        "authority": "J8yxcj9dWcEJBZtakEA9rZLJ3HKAH2Gea7GDeeucKFs6",
+        "bumpSeed": 249,
+        "tokenAccountA": "Bzysshk5kiYJW9KTPrRMwF5VzFzfuNzGwp7STnzVA71L",
+        "tokenAccountB": "7KZb1QSpacrDhSLzhGnQPscu8gTZ1QiZJYVybLLxzFfP",
+        "poolMint": "Eodj3kJti12fAQGt3jR4NaNbd6SPc5wEMjtxTevSKws6",
+        "feeAccount": "AmamV7TKWoMBLPPeG4kgZQt8Ew2cb6qN1Kj399DYDMUz",
+        "liquidityUSD": 100000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:38.002Z"
+      },
+      {
+        "name": "USDT-DAI-Large",
+        "address": "8NMJoEayhYpKAiSi2Ne2jC1HkdxwjCqXqPybfP8zNDAU",
+        "authority": "5fHU7dPhLuZKqZBJGt99qHVnnbYY5e1hoRTTbsD18s4f",
+        "bumpSeed": 254,
+        "tokenAccountA": "6TwqMLQeX4bv58VJF8FCWB9dJGMeYwfoc7wBwzqizXt1",
+        "tokenAccountB": "HmzhhFYDYR9e4DnSKWU45uT3w644AsGLWXMV7ZFc2xsG",
+        "poolMint": "2oMcTDqAwHgCuesW4gV8kVxw1nQojtMBY3oPSwhoXEuv",
+        "feeAccount": "FdP14DJYNBKe7KgqMET6SmfPZLme3tsA1eNP7vutxroJ",
+        "liquidityUSD": 400000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:47.744Z"
+      },
+      {
+        "name": "USDT-DAI-XL",
+        "address": "4xPNrXnGqphkKjnNMWwqXyJvfFEDXRxo9Tp1KpoVK374",
+        "authority": "2nQmm5ZzeyTsRr5jhGzxGzKdXwfrh9vBMYJVsSVfpU8t",
+        "bumpSeed": 254,
+        "tokenAccountA": "Gm7663fYt2K75R9dTAGbtJh99Dq2itxSffz5qc8m2kF6",
+        "tokenAccountB": "EkrbkyGc9F1VfR7nW5xkzktojtwDpquYSVo3RmZjJwMV",
+        "poolMint": "GWPfZ8CsWjt8neukDzcmksMZH2mxzNEUz3Aq74thCFEP",
+        "feeAccount": "2DgjyPWhQ173dhYruxDqNZSMb8WTcv44MupRpy9pUjYY",
+        "liquidityUSD": 2000000,
+        "feeBps": 5,
+        "createdAt": "2026-05-03T04:06:58.495Z"
+      }
+    ],
+    "WETH-WBTC": [
+      {
+        "name": "WETH-WBTC-Small",
+        "address": "8J5siYcTnFZUdeABDUqtWuPR2Wd935gmQFWWMo7C3w6n",
+        "authority": "2hbPSws3QhSn3oczfSMZ2vvG4t3ZafPNuX7Xj1nBioFr",
+        "bumpSeed": 253,
+        "tokenAccountA": "HKYRPEqR1MntDhwNpPvNpKHfjkKo6k43pC9eo7rJ1tQ7",
+        "tokenAccountB": "Ap9m2s3xa22bxNwScbRBfPjmNYSSGQRNiGABjkVxgvcL",
+        "poolMint": "CczcRaCMScGkLnCpCjEvKvMasv1vBA2rk1UmTLw5dNBq",
+        "feeAccount": "DdRx6rsvUUSZcAUowWKB3JxnaZ8WocUWGzZY8Y7Pk33e",
+        "liquidityUSD": 20000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:08:09.710Z"
+      },
+      {
+        "name": "WETH-WBTC-Medium",
+        "address": "5AViEp8PxwQ85M7gmXzv9insRCCkuNRyJ3EaUrPFqrM8",
+        "authority": "5CAr9NwqwFkCZSXZdpwesVS4FYTSuYfkEpsDVNN7QWaf",
+        "bumpSeed": 255,
+        "tokenAccountA": "6mttmACB41vEfp6THYvg1d6hzvXk1HaD1sp7SoFznKie",
+        "tokenAccountB": "EjMWCirCqrMnEwWmmKLdt6afiw54sRMAqV6qHEGoEjQf",
+        "poolMint": "HsqfEbX3vLtamyomQHNST3CFeYz9Kb2nTC9kc44Jkdra",
+        "feeAccount": "3TWFNHfk6pwc8N2AhAeDhQGABAS75mduXUHa2Rb8p5wg",
+        "liquidityUSD": 100000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:08:19.676Z"
+      },
+      {
+        "name": "WETH-WBTC-Large",
+        "address": "9AXTrhnAqghMYVFkjCwY8ZyRJJTHx6vug9ERLDHQA5Xv",
+        "authority": "86jHjeefPqTtVW22XVLTys6QwnjKp1CqtBcFH9MjinDg",
+        "bumpSeed": 255,
+        "tokenAccountA": "72QEKqK5AUEwzDZhrBkxPT5WoDAXFAu71hmqMwDFr7wD",
+        "tokenAccountB": "J6ZAjcxbsfyRmVbciAksWzMfySYWKtASGUM8QJ3C19x",
+        "poolMint": "7bfU9BYW8ds5t1PjJ4FKPfXMvzBYqz96DHqd1W7J3f7V",
+        "feeAccount": "HZbiwRtJRrhVAyUbqW1AKew4pWk2HKSAEUnh8B8D5vJf",
+        "liquidityUSD": 400000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:08:30.156Z"
+      },
+      {
+        "name": "WETH-WBTC-XL",
+        "address": "Ba5nDjwLJL8PpcJCzgnBQGxhAgmJaWHehEoQh9yCgGNe",
+        "authority": "CENqqsYJW4LSTH4X3dpr8y7ToxqJA9LteuwfjygZQpyK",
+        "bumpSeed": 255,
+        "tokenAccountA": "EjKYuHUe8pUpnbY62EtPNW1ubH5yJUEi1AJXeJzTWCf2",
+        "tokenAccountB": "EtPV9s1Ad5gkcHS45oNPioQdoTx92HzjrGyvxpwdZuSB",
+        "poolMint": "75u3FG6D5jYDNR4jY5VkJm3ZEu4PbjLNXA8Wj85UAubm",
+        "feeAccount": "7HVX4oyTbwC4HH8nQJxhpnAGmZ7QmaeAFeneXzG4rRcv",
+        "liquidityUSD": 2000000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:08:39.787Z"
+      }
+    ],
+    "WETH-USDT": [
+      {
+        "name": "WETH-USDT-Small",
+        "address": "HyXDz7XTWG6JxFz2QHAcgfjxtxY8efud75y4egyt1qx4",
+        "authority": "Ga1bnTjD6rKLxD3EF75o3tTAGMEfjRmcxd8ghsJaDG3K",
+        "bumpSeed": 254,
+        "tokenAccountA": "HwwC4DDfDDMxa6dRnTLepLvpHccDUnE5qUXPpmN4iBV5",
+        "tokenAccountB": "F5MvAHCDrzJHrUGF1YCtNsZyKesvKVqiYZ3bBTaFiHQn",
+        "poolMint": "95zZZdD2V6hxjy7jNqWnnvRoGdrDo1GirqFhbKcuh1q5",
+        "feeAccount": "HQ7HTxgFVLJDhKKBeUw7euwHaprKSUw6gL3JsAQy3tq7",
+        "liquidityUSD": 20000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:08:50.105Z"
+      },
+      {
+        "name": "WETH-USDT-Medium",
+        "address": "CMM4Qpj2WNcYhXEp6q8WUm3TrLY1uL8oWAgFs5vRANzw",
+        "authority": "8UWUSJoGafemKMiZGJurkNuYESnepCjBwcRGK1GTYyaj",
+        "bumpSeed": 251,
+        "tokenAccountA": "H1CZF8QXHxwYvR5g2UyqLdbJvn2YFGwGhqgV3qWJaebW",
+        "tokenAccountB": "HUUhQacrXxhW24T73YefVTWmrh7RB3mGX2o9PrLfMC9M",
+        "poolMint": "GuvxzhB8Yd37MbVnnziifaF4E6bihAcoWmaEnPEDAQzQ",
+        "feeAccount": "CMYZwrFEDowxhKs8meefdx2nUjopKANWLL2cbtLK82Ty",
+        "liquidityUSD": 100000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:09:00.234Z"
+      },
+      {
+        "name": "WETH-USDT-Large",
+        "address": "DDXMhGbjn7g8mQ9UcXpJ9YQmEiEQMtRXzfRfrpE6mXzp",
+        "authority": "HGoy4A9iu9ynFzFbYmETFfFryusV1eYNfRXBQ6RQJ8vf",
+        "bumpSeed": 255,
+        "tokenAccountA": "4He8TLGKqZeDeoFphCeHwTWCqVeRQNSYF98pqufvAH2a",
+        "tokenAccountB": "59Y6SP8juCsRSJc6ocqKPcoy4TaBf4qSLiqLttHJNeLi",
+        "poolMint": "7dZwrL3vJcPbk26W7mUTCJwaqgX18UH93mmG8v43faTV",
+        "feeAccount": "3WuyuDzysTBomoT5azjfhUdqWQY4ns57efELWD9vytdu",
+        "liquidityUSD": 400000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:09:11.047Z"
+      },
+      {
+        "name": "WETH-USDT-XL",
+        "address": "54HrDuNiiepAqy3JJF1oPq2CfpCC5o5pgZQ3vF83hrYS",
+        "authority": "5hEEoXfm2PUjbJBdCoUUpZX5mJ3LexAKq6S24tQviQSC",
+        "bumpSeed": 255,
+        "tokenAccountA": "44ERMY6wvVenqzR8SqGU6ikCzUTVcWrFF5fkwtnUta5F",
+        "tokenAccountB": "52jWWi4x54TchinimC4mmH84Xr8hdta3BU5UutU8wBMc",
+        "poolMint": "GpqeCADVKrTxt1ofrsgM8YPSBJhzB3kPEP5JPHeqLVt3",
+        "feeAccount": "8PgTaHxg3FcUk1BHefJR51Ar7ZvVKJxMYe67B1nGLd1b",
+        "liquidityUSD": 2000000,
+        "feeBps": 10,
+        "createdAt": "2026-05-03T04:09:19.997Z"
+      }
+    ]
+  }
+}

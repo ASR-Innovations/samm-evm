@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "rust-samm",
+    "solana-program",
+]
+resolver = "2"
