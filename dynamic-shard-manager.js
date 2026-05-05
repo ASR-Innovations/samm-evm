@@ -225,7 +225,49 @@ class DynamicShardManager {
              reason: `Oversized shard $${Math.round(largest.tvlUSD).toLocaleString()}` };
   }
 
-  // ── (Stubbed) on-chain actions — enabled when program is ready ─
+  // ── Soft-deactivation: mark dead shards inactive in deployment JSON ───────
+  // On Solana the program has no close instruction, so we can't delete pool
+  // accounts on-chain.  Instead, mark shards as { inactive: true } in the
+  // deployment file so the router skips them when quoting.
+  deactivateShard(pair, shardAddress, reason) {
+    const shards = this.deployment.pools[pair];
+    if (!shards) return false;
+    const shard = shards.find(s => s.address === shardAddress);
+    if (!shard || shard.inactive) return false;
+    shard.inactive = true;
+    shard.deactivatedAt = new Date().toISOString();
+    shard.deactivationReason = reason;
+    // Persist to deployment JSON so the router picks it up on next load
+    try {
+      fs.writeFileSync(this.deploymentPath, JSON.stringify(this.deployment, null, 2));
+      console.log(`   🔴 Deactivated shard ${shard.name} (${pair}): ${reason}`);
+      return true;
+    } catch (e) {
+      console.error(`   ⚠️  Failed to persist deactivation: ${e.message}`);
+      return false;
+    }
+  }
+
+  // Reactivate a previously deactivated shard
+  reactivateShard(pair, shardAddress) {
+    const shards = this.deployment.pools[pair];
+    if (!shards) return false;
+    const shard = shards.find(s => s.address === shardAddress);
+    if (!shard || !shard.inactive) return false;
+    delete shard.inactive;
+    delete shard.deactivatedAt;
+    delete shard.deactivationReason;
+    try {
+      fs.writeFileSync(this.deploymentPath, JSON.stringify(this.deployment, null, 2));
+      console.log(`   🟢 Reactivated shard ${shard.name} (${pair})`);
+      return true;
+    } catch (e) {
+      console.error(`   ⚠️  Failed to persist reactivation: ${e.message}`);
+      return false;
+    }
+  }
+
+  // ── (Stubbed) on-chain shard creation ──────────────────────────
   async createNewShard(_pair, _tier) {
     if (process.env.ENABLE_AUTO_SHARD_CREATE !== 'true') {
       console.log(`   ℹ️  Auto-shard creation disabled (set ENABLE_AUTO_SHARD_CREATE=true to enable)`);
@@ -272,11 +314,35 @@ class DynamicShardManager {
 
         console.log(`\n   ${pair}: ${shardAnalysis.length} shards → target ${optimal}, ${tpsLabel}, TVL: $${Math.round(pairTVL).toLocaleString()}`);
         for (const s of shardAnalysis) {
-          const h = s.isHealthy ? '✅' : '⚠️';
-          console.log(`      ${h} ${s.name}: $${Math.round(s.tvlUSD).toLocaleString()} TVL, max-swap: $${Math.round(s.maxSwapUSD)}, imbalance: ${(s.imbalance * 100).toFixed(1)}%`);
+          const depShard = (this.deployment.pools[pair] || []).find(d => d.address === s.address);
+          const isInactive = depShard?.inactive;
+          const h = isInactive ? '🔴' : s.isHealthy ? '✅' : '⚠️';
+          console.log(`      ${h} ${s.name}: $${Math.round(s.tvlUSD).toLocaleString()} TVL, max-swap: $${Math.round(s.maxSwapUSD)}, imbalance: ${(s.imbalance * 100).toFixed(1)}%${isInactive ? ' [INACTIVE]' : ''}`);
         }
 
-        // Act (currently only bootstrap is wired, split/merge TBD with on-chain calls)
+        // Soft-deactivate dead shards (TVL < $100 and not the only shard for the pair)
+        const activeAnalysis = shardAnalysis.filter(s => {
+          const dep = (this.deployment.pools[pair] || []).find(d => d.address === s.address);
+          return !dep?.inactive;
+        });
+        if (activeAnalysis.length > 1) {
+          for (const s of activeAnalysis) {
+            if (s.tvlUSD < 100) {
+              this.deactivateShard(pair, s.address, `TVL $${Math.round(s.tvlUSD)} below $100 threshold`);
+            }
+          }
+        }
+
+        // Reactivate shards that have recovered (TVL > $1000)
+        const inactiveShards = (this.deployment.pools[pair] || []).filter(d => d.inactive);
+        for (const dep of inactiveShards) {
+          const recovered = shardAnalysis.find(s => s.address === dep.address && s.tvlUSD > 1000);
+          if (recovered) {
+            this.reactivateShard(pair, dep.address);
+          }
+        }
+
+        // New shard needed?
         const needed = this.needsNewShard(pair, shardAnalysis);
         if (needed) {
           console.log(`      📌 ${needed.reason}`);

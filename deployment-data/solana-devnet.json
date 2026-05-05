@@ -2,6 +2,7 @@
   "_comment": "Populated by scripts/deploy-solana.js and scripts/initialize-pools.js",
   "network": "devnet",
   "programId": "AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ",
+  "routerProgramId": "DHwrqPKt3m2zXSiA57h97Z1zuyYE3s2KTwhnnAkaHVPu",
   "deployedAt": "2026-05-03T00:00:00.000Z",
   "tokens": {
     "USDC": {

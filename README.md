@@ -410,3 +410,31 @@ The server runs in **read-only mode** (all GET/quote endpoints work) if `SOLANA_
 - **Auto-scaling:** shard manager creates new shards when TPS exceeds `PER_SHARD_TPS × current_shards`
 - **Atomic routing:** multi-hop routes add only 1 transaction overhead vs N separate txs
 - **Price impact:** typically < 0.01% for $1–100 trades across 28 pools
+Everything is confirmed. Here's the full status:
+
+Branch: v0.3-solana — committed (97 files, clean working tree)
+
+Arb bot startup (when node api-server.js runs):
+
+Server starts and listens immediately on port 3000
+3 seconds later: arb bot starts (if ENABLE_ARBITRAGE != 'false' and keypair is set)
+8 seconds later: dynamic shard manager starts (if ENABLE_DYNAMIC_SHARDING != 'false')
+In read-only mode (no SOLANA_PRIVATE_KEY): server works fully for all GET endpoints + quotes, bots skipped
+Railway deployment flow:
+
+nixpacks installs nodejs_20 + rustc + cargo
+Build phase: cd rust-samm && cargo build --release → produces the math binary
+Then npm install --production
+Start: node api-server.js
+Set env vars on Railway: SOLANA_RPC_URL, SOLANA_PROGRAM_ID, SOLANA_PRIVATE_KEY, PORT=3000
+All commands:
+
+
+npm start                                    # start server (arb bot auto-starts at 3s)
+node scripts/initialize-pools.js            # create all 28 pool shards (run once)
+node scripts/verify-pools.js               # check on-chain pool state
+node scripts/test-swap.js USDC USDT 10     # single swap test
+node scripts/test-all-swaps.js             # quote all 20 pairs ($1 each)
+node scripts/test-all-swaps.js --execute   # live on-chain all pairs
+node scripts/user-swap-flow.js WBTC DAI 5  # full 4-step user flow demo
+npm run rust:build                          # rebuild rust-samm binary

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "rust-samm",
+    "samm-router",
     "solana-program",
 ]
 resolver = "2"

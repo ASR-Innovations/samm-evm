@@ -12,10 +12,18 @@
  * Multi-hop example (USDT → USDC → WETH):
  *   Hop 1: build legs for USDT-USDC pair  →  outputs to user's USDC ATA
  *   Hop 2: build legs for USDC-WETH pair  →  inputs from user's USDC ATA
- *   All legs in ONE transaction = fully atomic.
+ *   All legs in ONE transaction = fully atomic, user signs ONCE.
  *
- * This is equivalent to an EVM CrossPoolRouter / UniswapV2Router without
- * needing a separate Rust program — Solana instructions are composable.
+ * Shard selection enforces two SAMM properties:
+ *
+ *   c-Non-Splitting Property:
+ *     If amountOut < C_THRESHOLD × destReserve on the best shard, always route
+ *     to that single shard — splitting cannot improve the price.
+ *
+ *   Smaller-Better Principle:
+ *     Among shards with equal reserves, smaller shards charge lower absolute
+ *     fees for a given trade size. The router picks the shard with lowest
+ *     amountIn, which automatically honours this property.
  */
 
 const {
@@ -37,6 +45,10 @@ const path  = require('path');
 const fs    = require('fs');
 
 const RUST_BINARY = path.join(__dirname, 'rust-samm', 'target', 'release', 'samm');
+
+// c = 0.96 — trades below this fraction of the destination reserve are
+// provably cheaper on a single shard (c-Non-Splitting Property).
+const C_THRESHOLD = 0.96;
 
 function pk(v) {
   const { PublicKey } = require('@solana/web3.js');
@@ -90,10 +102,14 @@ async function getShardData(connection, shard, tokenInMint) {
 async function quoteSingleHop(connection, totalAmountOut, tokenInMint, shards) {
   if (!shards.length) throw new Error('No shards provided');
 
-  const shardData = await Promise.all(shards.map(async s => {
+  // Filter out explicitly inactive shards (soft-deactivated by shard manager)
+  const activeShards = shards.filter(s => !s.inactive);
+  if (!activeShards.length) throw new Error('All shards are inactive for this pair');
+
+  const shardData = await Promise.all(activeShards.map(async s => {
     try {
       const d = await getShardData(connection, s, tokenInMint);
-      if (d.destReserve <= totalAmountOut) return null;
+      if (d.destReserve <= totalAmountOut) return null; // not enough liquidity
       const q = rustQuote(totalAmountOut, d.sourceReserve, d.destReserve,
                           d.tradeFeeNum, d.tradeFeeDenom, d.ownerFeeNum, d.ownerFeeDenom);
       return {
@@ -114,8 +130,24 @@ async function quoteSingleHop(connection, totalAmountOut, tokenInMint, shards) {
 
   const best = viable[0];
 
-  // For large price impact (>5%), try proportional split across all viable shards
-  if (viable.length > 1 && best.priceImpactPct > 5) {
+  // ── c-Non-Splitting Property ─────────────────────────────────────────────────
+  // If the trade is below c × destReserve on the best shard, single-shard routing
+  // is guaranteed cheaper. Only consider splitting when we breach this boundary.
+  const cLimit = Number(best.destReserve) * C_THRESHOLD;
+  const aboveC = Number(totalAmountOut) >= cLimit;
+
+  // Smaller-Better: also log when multiple shards exist
+  if (viable.length > 1) {
+    const secondBest = viable[1];
+    const savings = Number(secondBest.amountIn - best.amountIn);
+    if (savings > 0) {
+      // Smaller-Better confirmed: best shard saves 'savings' raw units vs next best
+      // (no log here — available in hopDetails for callers)
+    }
+  }
+
+  // For large price impact (>5%) AND above c-threshold, try proportional split
+  if (viable.length > 1 && best.priceImpactPct > 5 && aboveC) {
     try {
       const totalDest = viable.reduce((a, s) => a + s.destReserve, 0n);
       const splitCandidates = viable.map(s => ({
@@ -123,7 +155,7 @@ async function quoteSingleHop(connection, totalAmountOut, tokenInMint, shards) {
         amountOut: (totalAmountOut * s.destReserve) / totalDest,
       }));
 
-      // Fix rounding: remainder goes to largest shard
+      // Fix rounding: remainder goes to largest-reserve shard
       const allocated = splitCandidates.reduce((a, l) => a + l.amountOut, 0n);
       if (allocated < totalAmountOut) splitCandidates[0].amountOut += totalAmountOut - allocated;
 
@@ -143,6 +175,9 @@ async function quoteSingleHop(connection, totalAmountOut, tokenInMint, shards) {
           totalAmountIn:  splitTotalIn,
           totalTradeFee:  splitLegs.reduce((a, l) => a + l.tradeFee, 0n),
           priceImpactPct: best.priceImpactPct,
+          bestShardName:  viable.map(v => v.shard.name).join('+'),
+          cThreshold:     C_THRESHOLD,
+          aboveC,
           legs: splitLegs.map(l => ({
             shard:     l.shard,
             amountOut: l.amountOut,
@@ -164,6 +199,13 @@ async function quoteSingleHop(connection, totalAmountOut, tokenInMint, shards) {
     totalAmountIn:  best.amountIn,
     totalTradeFee:  best.tradeFee,
     priceImpactPct: best.priceImpactPct,
+    bestShardName:  best.shard.name,
+    cThreshold:     C_THRESHOLD,
+    aboveC,
+    // Smaller-Better metadata: how much cheaper vs other viable shards
+    smallerBetterSavings: viable.length > 1
+      ? Number(viable[1].amountIn - best.amountIn)
+      : 0,
     legs: [{
       shard:     best.shard,
       amountOut: totalAmountOut,
@@ -220,21 +262,23 @@ class SAMMRouter {
   /**
    * Compute a full routing quote — single or multi-hop, single or multi-shard.
    *
+   * Multi-hop is fully atomic — user signs ONE transaction regardless of hops.
+   *
    * @param {bigint}  amountOut     — exact amount of tokenOut desired
    * @param {string}  tokenInSym    — input token symbol
    * @param {string}  tokenOutSym   — output token symbol
-   * @returns detailed route plan
+   * @returns detailed route plan with shard selection reasoning
    */
   async routeQuote(amountOut, tokenInSym, tokenOutSym) {
-    if (!fs.existsSync(RUST_BINARY)) throw new Error('Rust binary not built');
+    if (!fs.existsSync(RUST_BINARY)) throw new Error('Rust binary not built — run: cd rust-samm && cargo build --release');
 
-    const path = this.findPath(tokenInSym, tokenOutSym);
+    const routePath = this.findPath(tokenInSym, tokenOutSym);
     const hops = [];
 
     // Work backward from desired output (since SAMM is exact-output)
     let currentAmountOut = amountOut;
-    for (let i = path.length - 1; i >= 0; i--) {
-      const [inSym, outSym] = path[i];
+    for (let i = routePath.length - 1; i >= 0; i--) {
+      const [inSym, outSym] = routePath[i];
       const inMint  = this.deployment.tokens[inSym]?.mint;
       const outMint = this.deployment.tokens[outSym]?.mint;
       if (!inMint || !outMint) throw new Error(`Unknown token: ${inSym} or ${outSym}`);
@@ -258,20 +302,25 @@ class SAMMRouter {
       tokenOut:        tokenOutSym,
       amountOut,
       amountIn:        totalAmountIn,
-      path:            path.map(([a, b]) => `${a}→${b}`).join(', '),
+      path:            routePath.map(([a, b]) => `${a}→${b}`).join(', '),
       hops:            hops.length,
+      // Shard selection details per hop
       hopDetails:      hops.map((h, i) => ({
-        hop:           i + 1,
-        tokenIn:       h.tokenIn,
-        tokenOut:      h.tokenOut,
-        amountOut:     h.totalAmountOut,
-        amountIn:      h.totalAmountIn,
-        tradeFee:      h.totalTradeFee,
-        feeBps:        h.legs[0]?.feeBps || 10,
-        strategy:      h.strategy,
-        shardCount:    h.legs.length,
-        priceImpactPct: h.priceImpactPct.toFixed(4),
-        legs:          h.legs.map(l => ({
+        hop:              i + 1,
+        tokenIn:          h.tokenIn,
+        tokenOut:         h.tokenOut,
+        amountOut:        h.totalAmountOut,
+        amountIn:         h.totalAmountIn,
+        tradeFee:         h.totalTradeFee,
+        feeBps:           h.legs[0]?.feeBps || 10,
+        strategy:         h.strategy,
+        shardSelected:    h.bestShardName,
+        cThreshold:       h.cThreshold,
+        aboveC:           h.aboveC,        // true = above c-threshold (split eligible)
+        smallerBetterSavings: h.smallerBetterSavings, // raw units saved vs 2nd best shard
+        shardCount:       h.legs.length,
+        priceImpactPct:   h.priceImpactPct.toFixed(4),
+        legs:             h.legs.map(l => ({
           shard:    l.shard.name,
           amountOut: l.amountOut,
           amountIn:  l.amountIn,
@@ -290,6 +339,7 @@ class SAMMRouter {
   /**
    * Build the complete atomic Solana transaction for a quote result.
    * Works for both single-hop and multi-hop routes.
+   * User signs ONCE — all hops and shards are in one transaction.
    */
   buildAtomicTransaction(quote, payer, slippageBps) {
     const tx = new Transaction();

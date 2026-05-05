@@ -6,9 +6,9 @@
  * Demonstrates exactly how a user interacts with the SAMM DEX:
  *
  *   Step 1 — Faucet: get test tokens (devnet only)
- *   Step 2 — Quote:  preview the swap (fees, price impact, route)
- *   Step 3 — Swap:   execute on-chain atomically
- *   Step 4 — Verify: check final balances
+ *   Step 2 — Quote:  preview the swap (fees, price impact, route, shard selection)
+ *   Step 3 — Swap:   execute on-chain atomically (ONE transaction, ONE signature)
+ *   Step 4 — Verify: before vs after balances with delta
  *
  * Usage:
  *   node scripts/user-swap-flow.js                        # USDC→USDT 10 (default)
@@ -19,32 +19,54 @@
  *   API_URL=http://localhost:3000   (default)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * HOW THE BACKEND BUILDS & SUBMITS THE TRANSACTION
+ * MULTI-HOP ATOMICITY
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * On Solana, "signing" is done by the user's keypair.  The current setup has
- * the server sign with its operator keypair (for easy testing).
+ * Whether the swap is USDC→USDT (1 hop) or WBTC→DAI (WBTC→USDC→DAI, 2 hops),
+ * it ALWAYS executes in a SINGLE Solana transaction.
  *
- * For a real user-facing dApp the flow would be:
+ * The router builds N×(Approve + SwapSAMM) instructions — one pair per shard
+ * per hop — all in one atomic tx.  If any instruction fails, the entire swap
+ * reverts.  The user signs ONCE; there are no intermediate custody steps.
  *
- *   1. Frontend calls GET /quote/:tokenIn/:tokenOut/:amountOut
- *      → Server returns: amountIn, fees, route, price impact (read-only, no signing)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SHARD SELECTION (automatic — user never touches this)
+ * ─────────────────────────────────────────────────────────────────────────────
  *
- *   2. Frontend calls POST /build-tx  { tokenIn, tokenOut, amountOut, userAddress }
- *      → Server builds the Transaction object, serializes it, and returns base64
- *      → NO signing happens server-side for user funds
+ *   c-Non-Splitting Property (c = 0.96):
+ *     If amountOut < 0.96 × destReserve, routing to a single shard is always
+ *     cheaper than splitting.  The router enforces this automatically.
+ *
+ *   Smaller-Better Principle:
+ *     The router quotes every eligible shard via the Rust math binary and
+ *     picks the one with the lowest amountIn (best price for the user).
+ *     For equal reserves, a smaller shard charges less per unit swapped.
+ *
+ *   Split routing (rare):
+ *     Only when amountOut ≥ 0.96 × destReserve AND splitting is actually cheaper.
+ *     Trade is spread proportionally across all viable shards.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WALLET-CONNECTED dApp FLOW (production)
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *   1. GET /quote/:tokenIn/:tokenOut/:amountOut
+ *      → amountIn, fees, route, shard selection, price impact (no signing)
+ *
+ *   2. POST /build-tx  { tokenIn, tokenOut, amountOut, userAddress }
+ *      → Server builds the Transaction, returns base64; NO server-side signing
  *
  *   3. User's wallet (Phantom, Backpack, etc.) receives the base64 transaction,
- *      shows the user what it will do, and the user approves → wallet signs
+ *      shows what it will do, and user approves → wallet signs
  *
  *   4. Frontend submits the signed transaction to Solana RPC
  *      → Returns: transaction signature
  *
- *   5. Frontend polls GET /tx/:signature or uses Solana's confirmTransaction
+ *   5. Frontend polls GET /tx/:signature or Solana's confirmTransaction
  *      → Shows success / failure to user
  *
  * Currently POST /swap handles steps 2-4 all at once using the server keypair
- * (suitable for the operator's own funds, testing, and arb bot).
+ * (suitable for testing, arb bot, and operator's own funds).
  *
  * See samm-router.js buildAtomicTransaction() for the transaction construction.
  */
@@ -72,11 +94,21 @@ async function post(path, body) {
   return r.json();
 }
 
-function sep(char = '─', n = 70) { return char.repeat(n); }
+function sep(n = 70) { return '─'.repeat(n); }
 function bold(s) { return `\x1b[1m${s}\x1b[0m`; }
 function green(s) { return `\x1b[32m${s}\x1b[0m`; }
 function cyan(s)  { return `\x1b[36m${s}\x1b[0m`; }
 function red(s)   { return `\x1b[31m${s}\x1b[0m`; }
+function dim(s)   { return `\x1b[2m${s}\x1b[0m`; }
+
+function fmtDelta(before, after, sym) {
+  const b = parseFloat(before  || '0');
+  const a = parseFloat(after   || '0');
+  const d = a - b;
+  const sign = d >= 0 ? '+' : '';
+  const color = d > 0 ? green : d < 0 ? red : dim;
+  return `${color(`${sign}${d.toFixed(8)}`)} ${sym}  (${before} → ${after})`;
+}
 
 async function main() {
   console.log(bold(`\n${'═'.repeat(70)}`));
@@ -105,23 +137,44 @@ async function main() {
   const q = await get(`/quote/${TOKEN_IN}/${TOKEN_OUT}/${AMOUNT_OUT}`);
   if (q.error) { console.log(red(`         ❌ ${q.error}`)); process.exit(1); }
 
+  console.log(`         Route:   ${q.routePath}  (${q.hops} hop${q.hops > 1 ? 's' : ''}, SINGLE atomic tx)`);
   console.log(`         Swap:    ${AMOUNT_OUT} ${TOKEN_OUT} out`);
-  console.log(`         Pay:     ${q.amountIn} ${TOKEN_IN}  (${q.amountInUSD} USD)`);
+  console.log(`         Pay:     ${q.amountIn} ${TOKEN_IN}  (${ q.amountInUSD} USD)`);
   console.log(`         Receive: ${q.amountOut} ${TOKEN_OUT} (${q.amountOutUSD} USD)`);
   console.log(`         Rate:    ${q.effectiveRate} ${TOKEN_OUT}/${TOKEN_IN}`);
-  console.log(`         Route:   ${q.routePath}  (${q.hops} hop${q.hops > 1 ? 's' : ''})`);
   console.log(`         Fee:     ${q.totalFee} ${TOKEN_IN} (${q.totalFeeUSD} USD) — ${q.totalFeeBps} bps`);
   console.log(`         Impact:  ${q.priceImpactPct}%`);
 
-  if (q.hops > 1) {
-    console.log(`\n         Hop details:`);
+  if (q.hopDetails?.length) {
+    console.log(`\n         Shard selection per hop:`);
     for (const h of q.hopDetails) {
-      console.log(`           Hop ${h.hop}: ${h.tokenIn}→${h.tokenOut}  ${h.feeBps} bps  via ${h.legs.length} shard(s)`);
+      const cStatus = h.aboveC ? '⚠️  above c-threshold (split eligible)' : '✅ below c-threshold (single-shard optimal)';
+      console.log(`           Hop ${h.hop}: ${h.tokenIn}→${h.tokenOut}`);
+      console.log(`             Selected: ${h.shardSelected}  (strategy: ${h.strategy}, ${h.shardCount} shard(s))`);
+      console.log(`             Fee: ${h.feeBps} bps  Impact: ${h.priceImpactPct}%`);
+      console.log(`             c-property: ${cStatus}`);
+      if (h.smallerBetterSavings > 0) {
+        console.log(`             Smaller-better: saved ${h.smallerBetterSavings} raw units vs next shard`);
+      }
+      if (h.legs?.length > 1) {
+        console.log(`             Split legs:`);
+        for (const l of h.legs) {
+          console.log(`               ${l.shard}: out=${l.amountOut} in=${l.amountIn}`);
+        }
+      }
     }
   }
 
-  // ── Step 3: Execute ───────────────────────────────────────────────────────
-  console.log(`\n${cyan('Step 3 — Execute swap (on-chain atomic transaction)')}`);
+  // ── Step 3: Capture balance BEFORE swap ──────────────────────────────────
+  console.log(`\n${cyan('Step 3 — Capture balance before swap')}`);
+  const balsBefore = await get(`/balances/${WALLET}`);
+  const beforeIn  = balsBefore.balances?.[TOKEN_IN]?.balance  || '0';
+  const beforeOut = balsBefore.balances?.[TOKEN_OUT]?.balance || '0';
+  console.log(`         ${TOKEN_IN.padEnd(5)} before: ${beforeIn}`);
+  console.log(`         ${TOKEN_OUT.padEnd(5)} before: ${beforeOut}`);
+
+  // ── Step 4: Execute ───────────────────────────────────────────────────────
+  console.log(`\n${cyan('Step 4 — Execute swap (one atomic Solana transaction, one signature)')}`);
   console.log(`         Submitting to Solana devnet…`);
 
   const swap = await post('/swap', {
@@ -143,18 +196,42 @@ async function main() {
   console.log(`         Route:   ${swap.routePath} (${swap.hops} hop${swap.hops > 1 ? 's' : ''})`);
   console.log(`         Strategy: ${swap.strategy} | shards used: ${swap.shardsUsed}`);
 
-  // ── Step 4: Verify balances ───────────────────────────────────────────────
-  console.log(`\n${cyan('Step 4 — Verify final balances')}`);
-  const bals = await get(`/balances/${WALLET}`);
-  console.log(`         Wallet: ${WALLET}`);
-  for (const [sym, b] of Object.entries(bals.balances)) {
-    console.log(`           ${sym.padEnd(5)} ${b.balance}`);
+  // ── Step 5: Verify before vs after balances ───────────────────────────────
+  console.log(`\n${cyan('Step 5 — Verify before vs after balances (slippage check)')}`);
+  const balsAfter = await get(`/balances/${WALLET}`);
+  const afterOut  = balsAfter.balances?.[TOKEN_OUT]?.balance || '0';
+
+  console.log(`         Wallet: ${WALLET}\n`);
+
+  // Show delta for all tokens that changed
+  const allTokens = new Set([
+    ...Object.keys(balsBefore.balances || {}),
+    ...Object.keys(balsAfter.balances  || {}),
+  ]);
+  for (const sym of allTokens) {
+    const b = parseFloat(balsBefore.balances?.[sym]?.balance || '0');
+    const a = parseFloat(balsAfter.balances?.[sym]?.balance  || '0');
+    if (Math.abs(a - b) < 1e-10) continue; // unchanged
+    const d = a - b;
+    const sign = d >= 0 ? '+' : '';
+    const col = d > 0 ? green : red;
+    console.log(`         ${sym.padEnd(5)} ${col(`${sign}${d.toFixed(8)}`)}   (${b.toFixed(8)} → ${a.toFixed(8)})`);
+  }
+
+  // Slippage sanity check
+  const actualOut = parseFloat(afterOut) - parseFloat(beforeOut);
+  const expectedOut = parseFloat(AMOUNT_OUT);
+  const slippage = ((expectedOut - actualOut) / expectedOut) * 100;
+  if (Math.abs(slippage) < 0.01) {
+    console.log(green(`\n         ✅ Received exactly ${actualOut.toFixed(8)} ${TOKEN_OUT} (0.00% slippage)`));
+  } else {
+    console.log(`\n         Slippage: ${Math.abs(slippage).toFixed(4)}% (expected ${expectedOut}, got ${actualOut.toFixed(8)})`);
   }
 
   console.log(`\n${bold('═'.repeat(70))}`);
   console.log(green(bold('  ✅ Full user flow complete — swap executed on Solana devnet!')));
-  console.log(`\n  For a wallet-connected dApp, the flow is:`);
-  console.log(`    GET /quote → display to user → POST /build-tx → wallet signs → submit`);
+  console.log(`\n  Multi-hop / single-hop: always ONE Solana transaction, ONE signature.`);
+  console.log(`  For a wallet-connected dApp: GET /quote → POST /build-tx → wallet signs → submit`);
   console.log(`  See samm-router.js buildAtomicTransaction() for transaction construction.`);
   console.log(bold(`${'═'.repeat(70)}\n`));
 }

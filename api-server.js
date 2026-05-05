@@ -66,6 +66,9 @@ if (process.env.SOLANA_PRIVATE_KEY) {
 const adapter = new SolanaAdapter(connection, keypair, deployment, PROGRAM_ID);
 const SAMMRouter = require('./samm-router');
 const router = new SAMMRouter(connection, keypair, deployment, PROGRAM_ID);
+const { routerSwap } = require('./samm-router-client');
+
+const ROUTER_PROGRAM_ID = deployment.routerProgramId || process.env.SAMM_ROUTER_PROGRAM_ID || null;
 
 // ─── Oracle ───────────────────────────────────────────────────────
 const geckoIds = { WETH: 'ethereum', WBTC: 'bitcoin', USDC: 'usd-coin', USDT: 'tether', DAI: 'dai' };
@@ -207,7 +210,8 @@ app.get('/health', async (req, res) => {
     status: 'ok',
     deployment: DEPLOYMENT_FILE,
     network: deployment.network,
-    programId: PROGRAM_ID || null,
+    programId:       PROGRAM_ID || null,
+    routerProgramId: ROUTER_PROGRAM_ID || null,
     oraclePrices,
     wallet: walletInfo,
     arbitrageBot: arbitrageBot ? { running: arbitrageBot.isRunning, stats: arbitrageBot.stats } : { enabled: false },
@@ -348,7 +352,8 @@ app.post('/quote', async (req, res) => {
 // ── POST /swap — execute via on-chain atomic router ───────────────────────────
 app.post('/swap', async (req, res) => {
   if (!keypair) return res.status(400).json({ error: 'No wallet — read-only mode' });
-  if (!PROGRAM_ID) return res.status(503).json({ error: 'Program not deployed' });
+  if (!PROGRAM_ID) return res.status(503).json({ error: 'SAMM program not deployed' });
+  if (!ROUTER_PROGRAM_ID) return res.status(503).json({ error: 'Router program not deployed — set routerProgramId in deployment JSON' });
   try {
     const { tokenIn, tokenOut, amountOut, slippagePct = '1.0' } = req.body;
     if (!amountOut) return res.status(400).json({ error: 'Missing: amountOut' });
@@ -356,23 +361,55 @@ app.post('/swap', async (req, res) => {
     const tOut = deployment.tokens[tokenOut];
     if (!tIn || !tOut) return res.status(400).json({ error: 'Invalid token' });
 
-    const rawOut     = parseUnits(amountOut, tOut.decimals);
+    const rawOut      = parseUnits(amountOut, tOut.decimals);
     const slippageBps = BigInt(Math.round(parseFloat(slippagePct) * 100));
-    const quote      = await router.routeQuote(rawOut, tokenIn, tokenOut);
-    const sig        = await router.executeRoute(quote, slippageBps);
+
+    // Off-chain quote for metadata (fee bps, priceImpact, shard count).
+    const quote = await router.routeQuote(rawOut, tokenIn, tokenOut);
+
+    // Compute maxAmountIn using oracle prices — critical for cross-decimal pairs
+    // (e.g. USDC→WETH) where the JS router may mis-estimate direction.
+    // We use: oracleIn × (1 + slippage + 5% oracle uncertainty buffer).
+    await refreshOracle();
+    const tInPrice  = oraclePrices[tokenIn]  || tIn.price  || 1;
+    const tOutPrice = oraclePrices[tokenOut] || tOut.price || 1;
+    const amtOutHuman   = parseFloat(amountOut);
+    const oracleInHuman = amtOutHuman * (tOutPrice / tInPrice);
+    const bufferBps     = slippageBps + 500n;   // slippage + 5% oracle buffer
+    const oracleInRaw   = parseUnits(
+      oracleInHuman.toFixed(tIn.decimals),
+      tIn.decimals,
+    );
+    const maxAmountIn = oracleInRaw * (10000n + bufferBps) / 10000n + 1n;
+
+    // On-chain execution: router program reads live reserves, selects best shard,
+    // enforces c-Non-Splitting and Smaller-Better, issues CPI atomically.
+    const { sig, routePath, hops: routeHops } = await routerSwap({
+      connection,
+      keypair,
+      routerProgramId: ROUTER_PROGRAM_ID,
+      sammProgramId:   PROGRAM_ID,
+      deployment,
+      tokenInSym:   tokenIn,
+      tokenOutSym:  tokenOut,
+      amountOut:    rawOut,
+      slippageBps,
+      maxAmountIn,
+    });
 
     res.json({
-      success:    true,
-      txHash:     sig,
-      tokenIn,    tokenOut, amountOut,
-      amountIn:   formatUnits(quote.amountIn, tIn.decimals),
-      routePath:  quote.path,
-      hops:       quote.hopDetails.length,
-      strategy:   quote.hopDetails.map(h => h.strategy).join('+'),
-      shardsUsed: quote.hopDetails.reduce((a, h) => a + h.shardCount, 0),
-      feeBps:     quote.totalFeeBps,
+      success:        true,
+      txHash:         sig,
+      tokenIn,        tokenOut, amountOut,
+      amountIn:       formatUnits(quote.amountIn, tIn.decimals),
+      routePath,
+      hops:           routeHops,
+      routing:        'on-chain',
+      strategy:       quote.hopDetails.map(h => h.strategy).join('+'),
+      shardsUsed:     quote.hopDetails.reduce((a, h) => a + h.shardCount, 0),
+      feeBps:         quote.totalFeeBps,
       priceImpactPct: quote.priceImpactPct,
-      explorer:   `https://explorer.solana.com/tx/${sig}?cluster=devnet`,
+      explorer:       `https://explorer.solana.com/tx/${sig}?cluster=devnet`,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -531,6 +568,23 @@ app.post('/sharding/check', async (req, res) => {
   if (!shardManager) return res.status(400).json({ error: 'Not initialized' });
   try { await shardManager.checkAndManageShards(); res.json({ success: true, status: shardManager.getStatus() }); }
   catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Manual deactivate/reactivate endpoints (admin)
+app.post('/sharding/deactivate', (req, res) => {
+  if (!shardManager) return res.status(400).json({ error: 'Not initialized' });
+  const { pair, address, reason } = req.body;
+  if (!pair || !address) return res.status(400).json({ error: 'pair and address required' });
+  const ok = shardManager.deactivateShard(pair, address, reason || 'manual');
+  res.json({ success: ok, message: ok ? `Deactivated ${address}` : 'Not found or already inactive' });
+});
+
+app.post('/sharding/reactivate', (req, res) => {
+  if (!shardManager) return res.status(400).json({ error: 'Not initialized' });
+  const { pair, address } = req.body;
+  if (!pair || !address) return res.status(400).json({ error: 'pair and address required' });
+  const ok = shardManager.reactivateShard(pair, address);
+  res.json({ success: ok, message: ok ? `Reactivated ${address}` : 'Not found or already active' });
 });
 
 // ── Rust SAMM Math Verification ──
