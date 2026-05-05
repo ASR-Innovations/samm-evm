@@ -13,9 +13,16 @@
     "deploy:solana": "node scripts/deploy-solana.js",
     "init:pools": "node scripts/initialize-pools.js",
     "verify:pools": "node scripts/verify-pools.js",
-    "test:swap": "node scripts/test-swap.js"
+    "test:swap": "node scripts/test-swap.js",
+    "test:live": "node scripts/test-router-live.js"
   },
-  "keywords": ["SAMM", "AMM", "DeFi", "Solana", "Token Swap"],
+  "keywords": [
+    "SAMM",
+    "AMM",
+    "DeFi",
+    "Solana",
+    "Token Swap"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

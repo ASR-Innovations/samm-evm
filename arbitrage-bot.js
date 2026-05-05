@@ -43,6 +43,8 @@ class ArbitrageBot {
     this.TARGET_REBALANCE_PCT = 0.50;
     // Hard cap per swap in USD — prevents runaway rebalances on badly-imbalanced pools
     this.MAX_SWAP_USD = parseFloat(process.env.MAX_SWAP_USD || '500');
+    // Skip pools whose deviation exceeds this — they need massive capital, not $500 swaps
+    this.MAX_FIXABLE_DEVIATION_PCT = 98.0;
 
     this._approved   = new Set();
     this._shardCooldown = new Map();
@@ -133,7 +135,8 @@ class ArbitrageBot {
         const poolData = await this.getPoolData(shard.address, tokenASymbol, tokenBSymbol);
         if (!poolData) continue;
         const deviation = ((poolData.price - targetPrice) / targetPrice) * 100;
-        if (Math.abs(deviation) > this.MIN_DEVIATION_PCT) {
+        const absDev = Math.abs(deviation);
+        if (absDev > this.MIN_DEVIATION_PCT && absDev < this.MAX_FIXABLE_DEVIATION_PCT) {
           imbalances.push({
             pair, tokenASymbol, tokenBSymbol,
             shard: shard.address, shardName: shard.name,
@@ -193,7 +196,7 @@ class ArbitrageBot {
 
       // Quote
       const q = await this.adapter.calculateSwapSAMM(rawOut, tokenInMint, tokenOutMint, shard);
-      const maxIn = (q.amountIn * 120n) / 100n;
+      const maxIn = (q.amountIn * 200n) / 100n;
 
       // Pre-flight: check wallet balance covers maxIn
       const { getAssociatedTokenAddressSync } = require('@solana/spl-token');

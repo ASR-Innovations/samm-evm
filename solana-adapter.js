@@ -77,12 +77,15 @@ class SolanaAdapter {
       destReserve   = Number(r.reserveA);
     }
 
+    const feeNum   = Number(r.state.tradeFeeNumerator);
+    const feeDenom = Number(r.state.tradeFeeDenominator);
+
     const res = rustCall('swap-samm', {
       output_amount:  Number(amountOut),
       source_reserve: sourceReserve,
       dest_reserve:   destReserve,
-      trade_fee_num:  25,
-      trade_fee_denom:10000,
+      trade_fee_num:  feeNum   || 25,
+      trade_fee_denom:feeDenom || 10000,
       owner_fee_num:  0,
       owner_fee_denom:1,
     });
