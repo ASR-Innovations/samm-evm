@@ -1,229 +1,351 @@
 {
+  "_comment": "Auto-generated reference for frontend integration — all contract addresses verified on devnet",
   "network": "devnet",
   "rpcUrl": "https://api.devnet.solana.com",
+  "explorerBase": "https://explorer.solana.com",
   "sammProgramId": "AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ",
   "routerProgramId": "DHwrqPKt3m2zXSiA57h97Z1zuyYE3s2KTwhnnAkaHVPu",
   "deployedAt": "2026-05-03T00:00:00.000Z",
   "tokens": {
     "USDC": {
+      "symbol": "USDC",
       "mint": "8NYkWmgtd5Sd2YfitVoQviWNY8wtDXTuH4bykDP3yZKM",
       "decimals": 6,
-      "price": 1
+      "referencePrice": 1
     },
     "USDT": {
+      "symbol": "USDT",
       "mint": "5MVkBousJgvBwynVCw8oqAb5vNoyVaB59MGMRybLmpW7",
       "decimals": 6,
-      "price": 1
+      "referencePrice": 1
     },
     "WETH": {
+      "symbol": "WETH",
       "mint": "CC9VEegiHtEet2LXWoLWwt1QdEjPFgBtwLDAxnB6xVk7",
       "decimals": 9,
-      "price": 3000
+      "referencePrice": 3000
     },
     "WBTC": {
+      "symbol": "WBTC",
       "mint": "yhD6NWN78cZSZcbfiyVrvBMSDjQEiEnDEc2PgFdURku",
       "decimals": 8,
-      "price": 65000
+      "referencePrice": 65000
     },
     "DAI": {
+      "symbol": "DAI",
       "mint": "7EPCJuQFajxDQzbhA7LKmCsZfr4H43a6GX5oULQjdpNs",
       "decimals": 9,
-      "price": 1
+      "referencePrice": 1
     }
   },
   "pools": {
-    "USDC-USDT": [
-      {
-        "name": "USDC-USDT-Small",
-        "address": "AaCzwwGiuBUaLwyj6ComyMBWWhfLZwGncCUdhzpcsTGT",
-        "inactive": false
-      },
-      {
-        "name": "USDC-USDT-Medium",
-        "address": "HYcqqLeofeuJHYJivnSbJegGX2dS13ifxxW5S5CF6Rnd",
-        "inactive": false
-      },
-      {
-        "name": "USDC-USDT-Large",
-        "address": "7ypNMju4UcwA4hQYUkNm3vv62a6uzNA8vggMeg19Xzmr",
-        "inactive": false
-      },
-      {
-        "name": "USDC-USDT-XL",
-        "address": "BxgLJLZSYVdHJ9LQ2kgKBNnsgmQmL44eU6qJ2PyJ9J72",
-        "inactive": false
-      }
-    ],
-    "WETH-USDC": [
-      {
-        "name": "WETH-USDC-Small",
-        "address": "4VkjGLszvjZ1C2YVCA3gvALfhW2meLquLDao1K3huCV2",
-        "inactive": false
-      },
-      {
-        "name": "WETH-USDC-Medium",
-        "address": "JBatFMGXjapf4sHfhWdnWC25irQ8S6Gu72oUCt7zTRsD",
-        "inactive": false
-      },
-      {
-        "name": "WETH-USDC-Large",
-        "address": "AJLUAP8VXBmCovsjq1r1H8KoqqJ6xYwsGAQV4TD6Wdgf",
-        "inactive": false
-      },
-      {
-        "name": "WETH-USDC-XL",
-        "address": "4faBmJPGPjHCdt3GMy57fjJwDmsU5GbaWjqJ3Tk9timp",
-        "inactive": false
-      }
-    ],
-    "WBTC-USDC": [
-      {
-        "name": "WBTC-USDC-Small",
-        "address": "BonBFDPxAGY1zCdNsUAb2sgm6AReTc63Cpqh7jRopDzx",
-        "inactive": false
-      },
-      {
-        "name": "WBTC-USDC-Medium",
-        "address": "8ZGE1QBDFRMBuj1ZXABnzxpSD8CwUt9KqUzoMcy4SYkB",
-        "inactive": false
-      },
-      {
-        "name": "WBTC-USDC-Large",
-        "address": "6wnREvxGMUESf5eNhBxiqGBf8x7BkpT9EDHYsjvdQW77",
-        "inactive": false
-      },
-      {
-        "name": "WBTC-USDC-XL",
-        "address": "4S2HJ7nYYNYu2uU5YphReYvnWwgdDy6cufngR1xoNpaV",
-        "inactive": false
-      }
-    ],
-    "DAI-USDC": [
-      {
-        "name": "DAI-USDC-Small",
-        "address": "ExaWxELZ3yKvq685txS7nCYE5thtZphLGCXFWobENUoN",
-        "inactive": false
-      }
-    ],
-    "USDC-DAI": [
-      {
-        "name": "USDC-DAI-Small",
-        "address": "A9tqtkjUCVnrWZ6Am5N7KCJ1kJsnpu6YXD1nSuzb1ETk",
-        "inactive": false
-      },
-      {
-        "name": "USDC-DAI-Medium",
-        "address": "GVdCMkMjhcuJcuBBpfohTVNGHLvvkKHf4DxhR1EgpTwP",
-        "inactive": false
-      },
-      {
-        "name": "USDC-DAI-Large",
-        "address": "AK71KtZcSEv8ajtoYkHqVY55bAoJAyyQyTqN6r8Qpx8e",
-        "inactive": false
-      },
-      {
-        "name": "USDC-DAI-XL",
-        "address": "BMnBcRpkYcNqKe41qL2j5rLq6FTJRnVmJfdg18zJJPED",
-        "inactive": false
-      }
-    ],
-    "USDT-DAI": [
-      {
-        "name": "USDT-DAI-Small",
-        "address": "HFfjnASbjoxB33GFRt6Am8Z5ne4RPoQLYmaRCb9A4gH",
-        "inactive": false
-      },
-      {
-        "name": "USDT-DAI-Medium",
-        "address": "4nBZRd6mex85nLRVfNg5zcH7rey3qpqkf6r1LtB7Uf5R",
-        "inactive": false
-      },
-      {
-        "name": "USDT-DAI-Large",
-        "address": "8NMJoEayhYpKAiSi2Ne2jC1HkdxwjCqXqPybfP8zNDAU",
-        "inactive": false
-      },
-      {
-        "name": "USDT-DAI-XL",
-        "address": "4xPNrXnGqphkKjnNMWwqXyJvfFEDXRxo9Tp1KpoVK374",
-        "inactive": false
-      }
-    ],
-    "WETH-WBTC": [
-      {
-        "name": "WETH-WBTC-Small",
-        "address": "8J5siYcTnFZUdeABDUqtWuPR2Wd935gmQFWWMo7C3w6n",
-        "inactive": false
-      },
-      {
-        "name": "WETH-WBTC-Medium",
-        "address": "5AViEp8PxwQ85M7gmXzv9insRCCkuNRyJ3EaUrPFqrM8",
-        "inactive": false
-      },
-      {
-        "name": "WETH-WBTC-Large",
-        "address": "9AXTrhnAqghMYVFkjCwY8ZyRJJTHx6vug9ERLDHQA5Xv",
-        "inactive": false
-      },
-      {
-        "name": "WETH-WBTC-XL",
-        "address": "Ba5nDjwLJL8PpcJCzgnBQGxhAgmJaWHehEoQh9yCgGNe",
-        "inactive": false
-      }
-    ],
-    "WETH-USDT": [
-      {
-        "name": "WETH-USDT-Small",
-        "address": "HyXDz7XTWG6JxFz2QHAcgfjxtxY8efud75y4egyt1qx4",
-        "inactive": false
-      },
-      {
-        "name": "WETH-USDT-Medium",
-        "address": "CMM4Qpj2WNcYhXEp6q8WUm3TrLY1uL8oWAgFs5vRANzw",
-        "inactive": false
-      },
-      {
-        "name": "WETH-USDT-Large",
-        "address": "DDXMhGbjn7g8mQ9UcXpJ9YQmEiEQMtRXzfRfrpE6mXzp",
-        "inactive": false
-      },
-      {
-        "name": "WETH-USDT-XL",
-        "address": "54HrDuNiiepAqy3JJF1oPq2CfpCC5o5pgZQ3vF83hrYS",
-        "inactive": false
-      }
-    ]
+    "USDC-USDT": {
+      "pair": "USDC-USDT",
+      "shards": [
+        {
+          "name": "USDC-USDT-Small",
+          "address": "AaCzwwGiuBUaLwyj6ComyMBWWhfLZwGncCUdhzpcsTGT",
+          "inactive": false
+        },
+        {
+          "name": "USDC-USDT-Medium",
+          "address": "HYcqqLeofeuJHYJivnSbJegGX2dS13ifxxW5S5CF6Rnd",
+          "inactive": false
+        },
+        {
+          "name": "USDC-USDT-Large",
+          "address": "7ypNMju4UcwA4hQYUkNm3vv62a6uzNA8vggMeg19Xzmr",
+          "inactive": false
+        },
+        {
+          "name": "USDC-USDT-XL",
+          "address": "BxgLJLZSYVdHJ9LQ2kgKBNnsgmQmL44eU6qJ2PyJ9J72",
+          "inactive": false
+        }
+      ]
+    },
+    "WETH-USDC": {
+      "pair": "WETH-USDC",
+      "shards": [
+        {
+          "name": "WETH-USDC-Small",
+          "address": "4VkjGLszvjZ1C2YVCA3gvALfhW2meLquLDao1K3huCV2",
+          "inactive": false
+        },
+        {
+          "name": "WETH-USDC-Medium",
+          "address": "JBatFMGXjapf4sHfhWdnWC25irQ8S6Gu72oUCt7zTRsD",
+          "inactive": false
+        },
+        {
+          "name": "WETH-USDC-Large",
+          "address": "AJLUAP8VXBmCovsjq1r1H8KoqqJ6xYwsGAQV4TD6Wdgf",
+          "inactive": false
+        },
+        {
+          "name": "WETH-USDC-XL",
+          "address": "4faBmJPGPjHCdt3GMy57fjJwDmsU5GbaWjqJ3Tk9timp",
+          "inactive": false
+        }
+      ]
+    },
+    "WBTC-USDC": {
+      "pair": "WBTC-USDC",
+      "shards": [
+        {
+          "name": "WBTC-USDC-Small",
+          "address": "BonBFDPxAGY1zCdNsUAb2sgm6AReTc63Cpqh7jRopDzx",
+          "inactive": false
+        },
+        {
+          "name": "WBTC-USDC-Medium",
+          "address": "8ZGE1QBDFRMBuj1ZXABnzxpSD8CwUt9KqUzoMcy4SYkB",
+          "inactive": false
+        },
+        {
+          "name": "WBTC-USDC-Large",
+          "address": "6wnREvxGMUESf5eNhBxiqGBf8x7BkpT9EDHYsjvdQW77",
+          "inactive": false
+        },
+        {
+          "name": "WBTC-USDC-XL",
+          "address": "4S2HJ7nYYNYu2uU5YphReYvnWwgdDy6cufngR1xoNpaV",
+          "inactive": false
+        }
+      ]
+    },
+    "DAI-USDC": {
+      "pair": "DAI-USDC",
+      "shards": [
+        {
+          "name": "DAI-USDC-Small",
+          "address": "ExaWxELZ3yKvq685txS7nCYE5thtZphLGCXFWobENUoN",
+          "inactive": false
+        }
+      ]
+    },
+    "USDC-DAI": {
+      "pair": "USDC-DAI",
+      "shards": [
+        {
+          "name": "USDC-DAI-Small",
+          "address": "A9tqtkjUCVnrWZ6Am5N7KCJ1kJsnpu6YXD1nSuzb1ETk",
+          "inactive": false
+        },
+        {
+          "name": "USDC-DAI-Medium",
+          "address": "GVdCMkMjhcuJcuBBpfohTVNGHLvvkKHf4DxhR1EgpTwP",
+          "inactive": false
+        },
+        {
+          "name": "USDC-DAI-Large",
+          "address": "AK71KtZcSEv8ajtoYkHqVY55bAoJAyyQyTqN6r8Qpx8e",
+          "inactive": false
+        },
+        {
+          "name": "USDC-DAI-XL",
+          "address": "BMnBcRpkYcNqKe41qL2j5rLq6FTJRnVmJfdg18zJJPED",
+          "inactive": false
+        }
+      ]
+    },
+    "USDT-DAI": {
+      "pair": "USDT-DAI",
+      "shards": [
+        {
+          "name": "USDT-DAI-Small",
+          "address": "HFfjnASbjoxB33GFRt6Am8Z5ne4RPoQLYmaRCb9A4gH",
+          "inactive": false
+        },
+        {
+          "name": "USDT-DAI-Medium",
+          "address": "4nBZRd6mex85nLRVfNg5zcH7rey3qpqkf6r1LtB7Uf5R",
+          "inactive": false
+        },
+        {
+          "name": "USDT-DAI-Large",
+          "address": "8NMJoEayhYpKAiSi2Ne2jC1HkdxwjCqXqPybfP8zNDAU",
+          "inactive": false
+        },
+        {
+          "name": "USDT-DAI-XL",
+          "address": "4xPNrXnGqphkKjnNMWwqXyJvfFEDXRxo9Tp1KpoVK374",
+          "inactive": false
+        }
+      ]
+    },
+    "WETH-WBTC": {
+      "pair": "WETH-WBTC",
+      "shards": [
+        {
+          "name": "WETH-WBTC-Small",
+          "address": "8J5siYcTnFZUdeABDUqtWuPR2Wd935gmQFWWMo7C3w6n",
+          "inactive": false
+        },
+        {
+          "name": "WETH-WBTC-Medium",
+          "address": "5AViEp8PxwQ85M7gmXzv9insRCCkuNRyJ3EaUrPFqrM8",
+          "inactive": false
+        },
+        {
+          "name": "WETH-WBTC-Large",
+          "address": "9AXTrhnAqghMYVFkjCwY8ZyRJJTHx6vug9ERLDHQA5Xv",
+          "inactive": false
+        },
+        {
+          "name": "WETH-WBTC-XL",
+          "address": "Ba5nDjwLJL8PpcJCzgnBQGxhAgmJaWHehEoQh9yCgGNe",
+          "inactive": false
+        }
+      ]
+    },
+    "WETH-USDT": {
+      "pair": "WETH-USDT",
+      "shards": [
+        {
+          "name": "WETH-USDT-Small",
+          "address": "HyXDz7XTWG6JxFz2QHAcgfjxtxY8efud75y4egyt1qx4",
+          "inactive": false
+        },
+        {
+          "name": "WETH-USDT-Medium",
+          "address": "CMM4Qpj2WNcYhXEp6q8WUm3TrLY1uL8oWAgFs5vRANzw",
+          "inactive": false
+        },
+        {
+          "name": "WETH-USDT-Large",
+          "address": "DDXMhGbjn7g8mQ9UcXpJ9YQmEiEQMtRXzfRfrpE6mXzp",
+          "inactive": false
+        },
+        {
+          "name": "WETH-USDT-XL",
+          "address": "54HrDuNiiepAqy3JJF1oPq2CfpCC5o5pgZQ3vF83hrYS",
+          "inactive": false
+        }
+      ]
+    }
   },
   "summary": {
     "totalPairs": 8,
     "totalShards": 29
   },
-  "apiEndpoints": {
-    "health": "GET  /health",
-    "tokens": "GET  /tokens",
-    "pools": "GET  /pools",
-    "pairPools": "GET  /pools/:tokenA/:tokenB",
-    "quote": "GET  /quote/:tokenIn/:tokenOut/:amountOut",
-    "quotePost": "POST /quote  {tokenIn, tokenOut, amountOut}",
-    "swap": "POST /swap   {tokenIn, tokenOut, amountOut, slippagePct}",
-    "price": "GET  /price/:tokenA/:tokenB",
-    "balances": "GET  /balances/:address",
-    "balance": "GET  /balance/:address/:token",
-    "stats": "GET  /stats",
-    "arbStatus": "GET  /arbitrage/status",
-    "arbHist": "GET  /arbitrage/history",
-    "shardStat": "GET  /sharding/status",
-    "faucet": "POST /faucet {address, tokens?}"
-  },
   "routing": {
-    "description": "On-chain trustless shard selection via samm-router program",
-    "singleHop": "routeSwap (opcode 0): router reads live reserves, selects best shard via SAMM adaptive-fee formula, enforces c-Non-Splitting (c=0.96) and Smaller-Better Principle, issues CPI atomically",
-    "multiHop": "routeSwapMulti (opcode 1): backward quote (hop-2 first), then forward execute (hop-1 then hop-2) — all in ONE atomic transaction, ONE user signature",
-    "maxShardsPerHop": {
-      "singleHop": 3,
-      "multiHop": 1
+    "onChain": true,
+    "singleHop": {
+      "opcode": 0,
+      "maxShardsPerTx": 3,
+      "txSizeBytes": "~1053 bytes (3 shards × 6 accounts + 7 fixed)",
+      "description": "Router reads reserves from all provided shards, selects lowest amountIn, executes atomically"
     },
-    "cNonSplitting": "c=0.96: if amountOut < 0.96 × destReserve, single-shard is provably optimal",
-    "smallerBetter": "Larger reserve pool requires less amountIn for same amountOut — on-chain selection is automatic"
+    "multiHop": {
+      "opcode": 1,
+      "maxShardsPerHop": 1,
+      "txSizeBytes": "~931 bytes (2 hops × 1 shard × 6 accounts + 9 fixed)",
+      "description": "Backward quote (hop-2 first), forward execute (hop-1 then hop-2) — one tx, one signature"
+    },
+    "invariants": {
+      "cNonSplitting": "c=0.96: if amountOut < 0.96×destReserve, single-shard is provably optimal",
+      "smallerBetter": "Larger pools require less amountIn for same amountOut — router enforces automatically"
+    }
+  },
+  "api": {
+    "baseUrl": "http://localhost:3000",
+    "endpoints": {
+      "health": {
+        "method": "GET",
+        "path": "/health",
+        "description": "Server status, oracle prices, arb bot stats, router program ID",
+        "response": "{ status, programId, routerProgramId, oraclePrices, wallet, arbitrageBot, shardManager }"
+      },
+      "tokens": {
+        "method": "GET",
+        "path": "/tokens",
+        "description": "All tokens with live oracle prices",
+        "response": "{ tokens: [{ symbol, mint, decimals, price }] }"
+      },
+      "pools": {
+        "method": "GET",
+        "path": "/pools",
+        "description": "All pairs with shard TVL",
+        "response": "{ pools: [{ pair, shards: [...], totalLiquidityUSD }] }"
+      },
+      "poolsForPair": {
+        "method": "GET",
+        "path": "/pools/:tokenA/:tokenB",
+        "example": "/pools/WETH/USDC",
+        "description": "Shards for a specific pair with live reserves",
+        "response": "{ pair, shards: [{ name, address, tokenA, tokenB, reserveA, reserveB, liquidityUSD }] }"
+      },
+      "quoteGet": {
+        "method": "GET",
+        "path": "/quote/:tokenIn/:tokenOut/:amountOut",
+        "example": "/quote/USDC/WETH/0.001",
+        "description": "Quick routing quote with full hop breakdown",
+        "response": "{ tokenIn, tokenOut, amountOut, amountIn, amountInUSD, amountOutUSD, effectiveRate, slippagePct, totalFee, totalFeeBps, routePath, hops, hopDetails }"
+      },
+      "quotePost": {
+        "method": "POST",
+        "path": "/quote",
+        "body": "{ tokenIn, tokenOut, amountOut }",
+        "description": "Same as GET /quote — use POST for complex integration"
+      },
+      "swap": {
+        "method": "POST",
+        "path": "/swap",
+        "body": "{ tokenIn, tokenOut, amountOut, slippagePct? }",
+        "example": "{ tokenIn:USDC,tokenOut:WETH,amountOut:0.001,slippagePct:1.0 }",
+        "description": "Execute via on-chain router. Router selects best shard, enforces c-Non-Splitting + Smaller-Better, CPIs to SAMM atomically.",
+        "response": "{ success, txHash, tokenIn, tokenOut, amountOut, amountIn, routePath, hops, routing:on-chain, feeBps, priceImpactPct, explorer }"
+      },
+      "price": {
+        "method": "GET",
+        "path": "/price/:tokenA/:tokenB",
+        "example": "/price/USDC/WETH",
+        "description": "Live spot price with oracle deviation",
+        "response": "{ pair, price, description, oracleRate, deviationPct, routePath, feeBps }"
+      },
+      "balance": {
+        "method": "GET",
+        "path": "/balance/:address/:token",
+        "example": "/balance/3192e7.../USDC",
+        "description": "Single token balance for a wallet",
+        "response": "{ address, token, balance, balanceRaw }"
+      },
+      "balances": {
+        "method": "GET",
+        "path": "/balances/:address",
+        "description": "All token balances for a wallet",
+        "response": "{ address, balances: { USDC: { balance, balanceRaw, decimals, mint }, ... } }"
+      },
+      "stats": {
+        "method": "GET",
+        "path": "/stats",
+        "description": "DEX-wide stats: TVL per pair, total liquidity, oracle prices",
+        "response": "{ totalPairs, totalShards, totalLiquidityUSD, pairs: { pair: { shards, liquidityUSD } } }"
+      },
+      "arbStatus": {
+        "method": "GET",
+        "path": "/arbitrage/status",
+        "description": "Arb bot status + recent swaps",
+        "response": "{ running, cycles, swaps, totalUSD, recentSwaps }"
+      },
+      "arbHistory": {
+        "method": "GET",
+        "path": "/arbitrage/history?limit=20",
+        "description": "Full arb swap history with pre/post deviation"
+      },
+      "shardStatus": {
+        "method": "GET",
+        "path": "/sharding/status",
+        "description": "Shard manager status + active/inactive counts"
+      },
+      "faucet": {
+        "method": "POST",
+        "path": "/faucet",
+        "body": "{ address, tokens?: { USDC: 1000, WETH: 0.5 } }",
+        "description": "Devnet only: mint test tokens to any wallet (server is mint authority)",
+        "maxAmounts": "USDC/USDT/DAI: 10000, WETH: 5, WBTC: 0.1 per call"
+      }
+    }
   }
 }
