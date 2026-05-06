@@ -58,6 +58,7 @@ fee = max(r_min, β₁ × (OA/RA) + r_max)
               │  Solana Devnet      │
               │  spl-samm program   │
               │  29 pool shards     │
+              │  (27 active)        │
               └─────────────────────┘
 ```
 
@@ -125,14 +126,15 @@ cp .env.example .env
 Edit `.env`:
 
 ```
-SOLANA_RPC_URL=https://api.devnet.solana.com
+SOLANA_RPC_URL=https://solana-devnet.g.alchemy.com/v2/<your-key>
 SOLANA_PROGRAM_ID=AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ
+SAMM_ROUTER_PROGRAM_ID=DHwrqPKt3m2zXSiA57h97Z1zuyYE3s2KTwhnnAkaHVPu
 SOLANA_PRIVATE_KEY=<your-base58-keypair>
 
 # Arbitrage bot
 ENABLE_ARBITRAGE=true
 ARB_CHECK_INTERVAL=20000
-MAX_SWAP_USD=500
+MAX_SWAP_USD=5000
 
 # Dynamic sharding
 ENABLE_DYNAMIC_SHARDING=true
@@ -354,6 +356,9 @@ All instructions are in **one atomic transaction** — either all succeed or all
 | Solana Devnet | `AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ` |
 
 Pool and token addresses are in `deployment-data/solana-devnet.json`.
+
+> **Note:** WETH-USDC-Small and WBTC-USDC-Small are permanently inactive (initialized with 1:1
+> ratios, spot price ~99.9% off oracle). The router automatically routes to Medium/Large/XL shards.
 
 ---
 

@@ -282,6 +282,18 @@ The server auto-starts:
 
 Logs are printed to stdout in real time per cycle.
 
+> **RPC note:** Use a private RPC (e.g. Alchemy) via `SOLANA_RPC_URL`. The server derives the
+> WebSocket endpoint automatically (`https://` → `wss://`). Override with `SOLANA_WS_URL` if your
+> provider uses a different WSS path.
+
+---
+
+## Pool routing notes
+
+**WETH-USDC-Small** and **WBTC-USDC-Small** are permanently inactive. Both were initialized with
+1:1 token amounts (ignoring oracle price), leaving their spot price ~99.9% off oracle. The router
+skips them automatically; Medium/Large/XL shards handle all WETH↔USDC and WBTC↔USDC traffic.
+
 ---
 
 ## Running live swap tests (in a second terminal)
@@ -322,6 +334,7 @@ This builds with `cargo build-sbf`, deploys to the configured cluster, and write
 | `SOLANA_PRIVATE_KEY` | Base58 keypair (enables swaps + arb bot) |
 | `ENABLE_ARBITRAGE` | `true`/`false` (default: true) |
 | `ARB_CHECK_INTERVAL` | Arb check interval ms (default: 20000) |
-| `MAX_SWAP_USD` | Max single arb swap in USD (default: 500) |
+| `MAX_SWAP_USD` | Max single arb swap in USD (default: 5000) |
+| `SOLANA_WS_URL` | WebSocket endpoint override (auto-derived from `SOLANA_RPC_URL` if unset) |
 | `ENABLE_DYNAMIC_SHARDING` | `true`/`false` (default: true) |
 | `PORT` | API server port (default: 3000) |
