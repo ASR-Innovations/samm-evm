@@ -28,7 +28,6 @@
 
 const {
   Transaction,
-  sendAndConfirmTransaction,
 } = require('@solana/web3.js');
 const {
   createApproveInstruction,
@@ -410,13 +409,30 @@ class SAMMRouter {
     if (!this.keypair) throw new Error('No keypair — read-only mode');
 
     const tx = this.buildAtomicTransaction(quote, this.keypair, slippageBps);
-    const { blockhash } = await this.connection.getLatestBlockhash();
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.keypair.publicKey;
+    tx.sign(this.keypair);
 
-    return sendAndConfirmTransaction(this.connection, tx, [this.keypair], {
-      commitment: 'confirmed',
+    const raw = tx.serialize();
+    const sig = await this.connection.sendRawTransaction(raw, {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+      maxRetries: 3,
     });
+
+    // Polling-based confirmation — avoids signatureSubscribe WebSocket dependency
+    const deadline = lastValidBlockHeight;
+    while (true) {
+      const { value } = await this.connection.getSignatureStatus(sig, { searchTransactionHistory: false });
+      if (value) {
+        if (value.err) throw new Error('Transaction failed on-chain: ' + JSON.stringify(value.err));
+        if (value.confirmationStatus === 'confirmed' || value.confirmationStatus === 'finalized') return sig;
+      }
+      const currentHeight = await this.connection.getBlockHeight();
+      if (currentHeight > deadline) throw new Error('Transaction expired (block height exceeded): ' + sig);
+      await new Promise(r => setTimeout(r, 1500));
+    }
   }
 
   /**

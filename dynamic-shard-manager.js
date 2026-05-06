@@ -254,6 +254,8 @@ class DynamicShardManager {
     if (!shards) return false;
     const shard = shards.find(s => s.address === shardAddress);
     if (!shard || !shard.inactive) return false;
+    // Never reactivate pools flagged with a bad-price reason — TVL recovery doesn't fix bad init
+    if (shard.permanentlyInactive) return false;
     delete shard.inactive;
     delete shard.deactivatedAt;
     delete shard.deactivationReason;

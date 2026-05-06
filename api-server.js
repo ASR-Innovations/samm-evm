@@ -52,7 +52,14 @@ try {
 
 const PROGRAM_ID = process.env.SOLANA_PROGRAM_ID || deployment.programId;
 
-const connection = new Connection(RPC_URL, 'confirmed');
+// Derive WebSocket endpoint so sendAndConfirmTransaction can subscribe to confirmations.
+// Alchemy (and most private RPC providers) use wss:// at the same path as https://.
+const WS_URL = (process.env.SOLANA_WS_URL
+  || RPC_URL.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://'));
+const connection = new Connection(RPC_URL, {
+  commitment: 'confirmed',
+  wsEndpoint: WS_URL,
+});
 
 // Wallet keypair (optional — read-only mode without it)
 let keypair  = null;

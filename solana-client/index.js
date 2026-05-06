@@ -11,7 +11,6 @@ const {
   PublicKey,
   Transaction,
   TransactionInstruction,
-  sendAndConfirmTransaction,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
 } = require('@solana/web3.js');
@@ -336,19 +335,38 @@ async function executeSwap(
     maximalAmountIn,
   }));
 
-  if (recentBlockhash) {
-    tx.recentBlockhash = recentBlockhash;
-  } else {
-    const { blockhash } = await connection.getLatestBlockhash();
-    tx.recentBlockhash = blockhash;
-  }
-  tx.feePayer = payer.publicKey;
+  // Fetch fresh blockhash with lastValidBlockHeight for expiry tracking
+  const { blockhash, lastValidBlockHeight } = recentBlockhash
+    ? { blockhash: recentBlockhash, lastValidBlockHeight: null }
+    : await connection.getLatestBlockhash('confirmed');
 
-  return sendAndConfirmTransaction(connection, tx, [payer], {
-    commitment: 'confirmed',
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = payer.publicKey;
+  tx.sign(payer);
+
+  const raw = tx.serialize();
+  const sig = await connection.sendRawTransaction(raw, {
+    skipPreflight: false,
     preflightCommitment: 'confirmed',
     maxRetries: 3,
   });
+
+  // Poll for confirmation — avoids signatureSubscribe WebSocket dependency
+  const deadline = lastValidBlockHeight
+    ? lastValidBlockHeight
+    : (await connection.getBlockHeight()) + 150;
+
+  while (true) {
+    const { value } = await connection.getSignatureStatus(sig, { searchTransactionHistory: false });
+    if (value) {
+      if (value.err) throw new Error('Transaction failed on-chain: ' + JSON.stringify(value.err));
+      const level = value.confirmationStatus;
+      if (level === 'confirmed' || level === 'finalized') return sig;
+    }
+    const currentHeight = await connection.getBlockHeight();
+    if (currentHeight > deadline) throw new Error('Transaction expired (block height exceeded): ' + sig);
+    await new Promise(r => setTimeout(r, 1500));
+  }
 }
 
 module.exports = {

@@ -94,7 +94,10 @@
         "poolMint": "9fGEMsECCC9UjMfnZcZCvrPdo15fSx1Y5NaN74tSzyzB",
         "feeAccount": "6nxbJ3xVo8jf2cAntdECvZurMeJMibmJXZyEPDEffSP4",
         "authority": "9SMQmdxNtcFJMQcANteEbGcz9YKocCkxh6cK8J4oVrLi",
-        "createdAt": "2026-05-02T19:03:12.083Z"
+        "createdAt": "2026-05-02T19:03:12.083Z",
+        "inactive": true,
+        "permanentlyInactive": true,
+        "deactivationReason": "Pool initialized with 1:1 token ratio ignoring oracle price — spot price ~99.9% off oracle"
       },
       {
         "name": "WETH-USDC-Medium",
@@ -146,7 +149,10 @@
         "poolMint": "G3JB6cdCkcxasJAABbhdzUenMS42n4SrGnyg91NH6EKM",
         "feeAccount": "Aw1XdxVGcFeSU78VkRpL5jcoM7qJQBcnvFntjfom8Cd5",
         "authority": "8gknqP6ssnvyQupBYDFTbDNBozGJbZHEHdino1X3zVV8",
-        "createdAt": "2026-05-02T19:03:23.143Z"
+        "createdAt": "2026-05-02T19:03:23.143Z",
+        "inactive": true,
+        "permanentlyInactive": true,
+        "deactivationReason": "Pool initialized with 1:1 token ratio ignoring oracle price — spot price ~99.9% off oracle"
       },
       {
         "name": "WBTC-USDC-Medium",

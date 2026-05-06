@@ -20,7 +20,6 @@ const {
   PublicKey,
   Transaction,
   TransactionInstruction,
-  sendAndConfirmTransaction,
 } = require('@solana/web3.js');
 const {
   getAssociatedTokenAddressSync,
@@ -404,11 +403,31 @@ async function routerSwap({
     tokenInSym, tokenOutSym, amountOut, slippageBps, maxAmountIn,
   });
 
-  const { blockhash } = await connection.getLatestBlockhash();
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   tx.recentBlockhash = blockhash;
   tx.feePayer = keypair.publicKey;
+  tx.sign(keypair);
 
-  const sig = await sendAndConfirmTransaction(connection, tx, [keypair], { commitment: 'confirmed' });
+  const raw = tx.serialize();
+  const sig = await connection.sendRawTransaction(raw, {
+    skipPreflight: false,
+    preflightCommitment: 'confirmed',
+    maxRetries: 3,
+  });
+
+  // Polling-based confirmation — avoids signatureSubscribe WebSocket dependency
+  const deadline = lastValidBlockHeight;
+  while (true) {
+    const { value } = await connection.getSignatureStatus(sig, { searchTransactionHistory: false });
+    if (value) {
+      if (value.err) throw new Error('Transaction failed on-chain: ' + JSON.stringify(value.err));
+      if (value.confirmationStatus === 'confirmed' || value.confirmationStatus === 'finalized') break;
+    }
+    const currentHeight = await connection.getBlockHeight();
+    if (currentHeight > deadline) throw new Error('Transaction expired (block height exceeded): ' + sig);
+    await new Promise(r => setTimeout(r, 1500));
+  }
+
   return { sig, routePath, hops };
 }
 
