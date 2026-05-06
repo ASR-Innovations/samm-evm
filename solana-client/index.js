@@ -344,7 +344,11 @@ async function executeSwap(
   }
   tx.feePayer = payer.publicKey;
 
-  return sendAndConfirmTransaction(connection, tx, [payer], { commitment: 'confirmed' });
+  return sendAndConfirmTransaction(connection, tx, [payer], {
+    commitment: 'confirmed',
+    preflightCommitment: 'confirmed',
+    maxRetries: 3,
+  });
 }
 
 module.exports = {

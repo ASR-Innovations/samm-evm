@@ -41,10 +41,8 @@ class ArbitrageBot {
     this.SAFETY_MARGIN     = 0.90;
     this.MIN_DEVIATION_PCT = 0.30;
     this.TARGET_REBALANCE_PCT = 0.50;
-    // Hard cap per swap in USD — prevents runaway rebalances on badly-imbalanced pools
-    this.MAX_SWAP_USD = parseFloat(process.env.MAX_SWAP_USD || '500');
-    // Skip pools whose deviation exceeds this — they need massive capital, not $500 swaps
-    this.MAX_FIXABLE_DEVIATION_PCT = 98.0;
+    // Hard cap per swap in USD — env MAX_SWAP_USD, default $5000
+    this.MAX_SWAP_USD = parseFloat(process.env.MAX_SWAP_USD || '5000');
 
     this._approved   = new Set();
     this._shardCooldown = new Map();
@@ -134,9 +132,9 @@ class ArbitrageBot {
       for (const shard of shards) {
         const poolData = await this.getPoolData(shard.address, tokenASymbol, tokenBSymbol);
         if (!poolData) continue;
+        await new Promise(r => setTimeout(r, 80)); // throttle RPC burst
         const deviation = ((poolData.price - targetPrice) / targetPrice) * 100;
-        const absDev = Math.abs(deviation);
-        if (absDev > this.MIN_DEVIATION_PCT && absDev < this.MAX_FIXABLE_DEVIATION_PCT) {
+        if (Math.abs(deviation) > this.MIN_DEVIATION_PCT) {
           imbalances.push({
             pair, tokenASymbol, tokenBSymbol,
             shard: shard.address, shardName: shard.name,
