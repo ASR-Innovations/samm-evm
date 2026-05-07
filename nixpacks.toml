@@ -1,10 +1,16 @@
 [phases.setup]
-nixPkgs = ['nodejs_20', 'rustc', 'cargo', 'gcc']
+nixPkgs = ['nodejs_20', 'rustc', 'cargo', 'pkg-config', 'openssl']
 
 [phases.install]
 cmds = [
-  'cd rust-samm && cargo build --release',
   'npm install --production',
+]
+
+[phases.build]
+cmds = [
+  'cd rust-samm && cargo build --release',
+  'ls -la rust-samm/target/release/ || echo "Build directory not found"',
+  'test -f rust-samm/target/release/samm && echo "✓ Rust binary built successfully" || echo "✗ Rust binary NOT found"',
 ]
 
 [start]
