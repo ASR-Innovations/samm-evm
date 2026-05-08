@@ -9,8 +9,11 @@ cmds = [
 [phases.build]
 cmds = [
   'cd rust-samm && cargo build --release',
-  'ls -la rust-samm/target/release/',
-  'test -f rust-samm/target/release/samm && echo "✓ Rust binary exists" || (echo "✗ Binary NOT found" && exit 1)',
+  'ls -la target/release/',
+  'mkdir -p rust-samm/target/release',
+  'cp target/release/samm rust-samm/target/release/samm',
+  'ls -la rust-samm/target/release/samm',
+  'test -f rust-samm/target/release/samm && echo "✓ Rust binary copied to rust-samm/target/release/samm" || (echo "✗ Binary NOT found" && exit 1)',
 ]
 
 [start]
