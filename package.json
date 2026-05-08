@@ -4,6 +4,7 @@
   "description": "SAMM — Stableswap AMM on Solana (program + JS backend)",
   "main": "api-server.js",
   "scripts": {
+    "build": "npm run rust:build",
     "start": "node api-server.js",
     "test:offchain": "mocha test/offchain/**/*.test.js",
     "test:offchain:rust": "mocha test/offchain/rust-binary-verification.test.js test/offchain/rust-verification.test.js",
