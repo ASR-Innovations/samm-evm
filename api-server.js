@@ -653,38 +653,18 @@ app.post('/faucet', async (req, res) => {
   const { address, tokens: requested } = req.body;
   if (!address) return res.status(400).json({ error: 'Missing: address' });
 
-  const { PublicKey, Transaction } = require('@solana/web3.js');
+  const {
+    PublicKey, Transaction, sendAndConfirmTransaction,
+  } = require('@solana/web3.js');
   const {
     getAssociatedTokenAddressSync,
     createAssociatedTokenAccountIdempotentInstruction,
-    createMintToInstruction,
+    mintTo,
   } = require('@solana/spl-token');
 
   let recipient;
   try { recipient = new PublicKey(address); }
   catch { return res.status(400).json({ error: 'Invalid address' }); }
-
-  // Polling-based send+confirm — avoids signatureSubscribe WebSocket (not
-  // supported on Alchemy devnet). Mirrors the pattern in samm-router-client.js.
-  async function sendAndPoll(tx) {
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = keypair.publicKey;
-    tx.sign(keypair);
-    const raw = tx.serialize();
-    const sig = await connection.sendRawTransaction(raw, { skipPreflight: false, maxRetries: 2 });
-    // Poll until confirmed or block height exceeded
-    while (true) {
-      const { value } = await connection.getSignatureStatus(sig, { searchTransactionHistory: false });
-      if (value) {
-        if (value.err) throw new Error('Transaction failed: ' + JSON.stringify(value.err));
-        if (value.confirmationStatus === 'confirmed' || value.confirmationStatus === 'finalized') return sig;
-      }
-      const height = await connection.getBlockHeight();
-      if (height > lastValidBlockHeight) throw new Error('Transaction expired: ' + sig);
-      await new Promise(r => setTimeout(r, 1500));
-    }
-  }
 
   const amounts = requested || FAUCET_DEFAULTS;
   const results = {};
@@ -702,12 +682,14 @@ app.post('/faucet', async (req, res) => {
       const mintPk = new PublicKey(t.mint);
       const ata    = getAssociatedTokenAddressSync(mintPk, recipient);
 
-      // Combine ATA creation (idempotent) + mint into one transaction
-      const tx = new Transaction()
-        .add(createAssociatedTokenAccountIdempotentInstruction(keypair.publicKey, ata, recipient, mintPk))
-        .add(createMintToInstruction(mintPk, ata, keypair.publicKey, rawAmt));
+      // Ensure ATA exists (idempotent)
+      const ensureTx = new Transaction().add(
+        createAssociatedTokenAccountIdempotentInstruction(keypair.publicKey, ata, recipient, mintPk),
+      );
+      await sendAndConfirmTransaction(connection, ensureTx, [keypair], { commitment: 'confirmed' });
 
-      const sig = await sendAndPoll(tx);
+      // Mint
+      const sig = await mintTo(connection, keypair, mintPk, ata, keypair, rawAmt);
 
       results[sym] = {
         amount: clamped.toString(),
