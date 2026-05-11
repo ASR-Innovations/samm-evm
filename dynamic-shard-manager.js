@@ -323,11 +323,13 @@ class DynamicShardManager {
         }
 
         // Soft-deactivate dead shards (TVL < $100 and not the only shard for the pair)
+        // Guard: skip if ALL shards show $0 TVL — indicates oracle/RPC failure, not dead pools
         const activeAnalysis = shardAnalysis.filter(s => {
           const dep = (this.deployment.pools[pair] || []).find(d => d.address === s.address);
           return !dep?.inactive;
         });
-        if (activeAnalysis.length > 1) {
+        const totalActiveTVL = activeAnalysis.reduce((sum, s) => sum + s.tvlUSD, 0);
+        if (activeAnalysis.length > 1 && totalActiveTVL > 500) {
           for (const s of activeAnalysis) {
             if (s.tvlUSD < 100) {
               this.deactivateShard(pair, s.address, `TVL $${Math.round(s.tvlUSD)} below $100 threshold`);
