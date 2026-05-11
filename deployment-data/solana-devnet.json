@@ -42,7 +42,10 @@
         "poolMint": "8jzLomJeKzQsnnRnRAiMGaDDsAfYnSFtSJTjfo5nsi5M",
         "feeAccount": "U7GzBhfPiQraH7ARDPoP12U9uATVXWxGGHWRUVJqr94",
         "authority": "6B28WD2F2c2J6178fiitcvSpP6KozyXsQVDFjKSK1sHv",
-        "createdAt": "2026-05-02T19:03:00.785Z"
+        "createdAt": "2026-05-02T19:03:00.785Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:48:34.755Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDC-USDT-Medium",
@@ -55,7 +58,10 @@
         "feeAccount": "4NmMviWRRuD3ugbhhTXoehvz9DcyniXK4KQQGQm9wPKe",
         "liquidityUSD": 100000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:05:22.853Z"
+        "createdAt": "2026-05-03T04:05:22.853Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:35.875Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDC-USDT-Large",
@@ -68,7 +74,10 @@
         "feeAccount": "5jBoJXgZATZUmTDSwChhKvQT5KpmEbCRoFoUDonhyeo5",
         "liquidityUSD": 400000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:05:32.945Z"
+        "createdAt": "2026-05-03T04:05:32.945Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:35.876Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDC-USDT-XL",
@@ -81,7 +90,10 @@
         "feeAccount": "9nk1HoVnYYKTWn3PU9TWbYK4zu5TmC8fLnTRerD75jtC",
         "liquidityUSD": 2000000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:05:42.414Z"
+        "createdAt": "2026-05-03T04:05:42.414Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:35.876Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ],
     "WETH-USDC": [
@@ -110,7 +122,10 @@
         "feeAccount": "9HQhSoDsscHp2Ex11s9UWiEkARJJwUQsZk2grMUSPRzm",
         "liquidityUSD": 100000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:07:08.692Z"
+        "createdAt": "2026-05-03T04:07:08.692Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:36.690Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-USDC-Large",
@@ -123,7 +138,10 @@
         "feeAccount": "GVtBMQbz3j7caGK89p2n8wfjyhmWuTTH2Pjcs5DX4SNK",
         "liquidityUSD": 400000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:07:19.427Z"
+        "createdAt": "2026-05-03T04:07:19.427Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:36.691Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-USDC-XL",
@@ -136,7 +154,10 @@
         "feeAccount": "Hrb1iVxrbWfCcn9m7thow3mJ5s1YsiQNUPRVchA44NWR",
         "liquidityUSD": 2000000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:07:29.758Z"
+        "createdAt": "2026-05-03T04:07:29.758Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:36.692Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ],
     "WBTC-USDC": [
@@ -165,7 +186,10 @@
         "feeAccount": "3xuWHJdKmBfGkojp5tpC8jGNxRBB7NnQLtv8VmebnGU5",
         "liquidityUSD": 100000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:07:39.389Z"
+        "createdAt": "2026-05-03T04:07:39.389Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:37.687Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WBTC-USDC-Large",
@@ -178,7 +202,10 @@
         "feeAccount": "3QvyC3NEzih1fTjWgekygeYhRoAyc53QMvumUrHdAfGZ",
         "liquidityUSD": 400000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:07:49.492Z"
+        "createdAt": "2026-05-03T04:07:49.492Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:37.688Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WBTC-USDC-XL",
@@ -191,7 +218,10 @@
         "feeAccount": "C8oTiwYZmt2nv1tBUVAGSj6qupBDVDk3RfonRyWm3Efh",
         "liquidityUSD": 2000000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:07:59.849Z"
+        "createdAt": "2026-05-03T04:07:59.849Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:37.689Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ],
     "DAI-USDC": [
@@ -219,7 +249,10 @@
         "feeAccount": "2anZoQrUz2865qW1wtvyorr64KmNQ7vTaWSnqnNUYG3w",
         "liquidityUSD": 20000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:05:51.647Z"
+        "createdAt": "2026-05-03T04:05:51.647Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:43.085Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDC-DAI-Medium",
@@ -232,7 +265,10 @@
         "feeAccount": "GRcQeR6Nwq46fJvkENUQdBQXhGd9X9pFibN55dhwnVs",
         "liquidityUSD": 100000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:00.947Z"
+        "createdAt": "2026-05-03T04:06:00.947Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:43.086Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDC-DAI-Large",
@@ -245,7 +281,10 @@
         "feeAccount": "hvZn9DCLAmWuc5gP8D5SRcaHMnD8ntFdBqzmdsvhYVk",
         "liquidityUSD": 400000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:09.907Z"
+        "createdAt": "2026-05-03T04:06:09.907Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:43.086Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDC-DAI-XL",
@@ -258,7 +297,10 @@
         "feeAccount": "BaLhF87pUp1RQfWKk7CAJmvXw2kWpRQoCGTHKNtsWAvc",
         "liquidityUSD": 2000000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:19.742Z"
+        "createdAt": "2026-05-03T04:06:19.742Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:49:43.087Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ],
     "USDT-DAI": [
@@ -273,7 +315,10 @@
         "feeAccount": "8FDKcrvwKTHHek7uN1GqpnrAXzaLj9FKdR3Fvnof87RC",
         "liquidityUSD": 20000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:28.798Z"
+        "createdAt": "2026-05-03T04:06:28.798Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:47.002Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDT-DAI-Medium",
@@ -286,7 +331,10 @@
         "feeAccount": "AmamV7TKWoMBLPPeG4kgZQt8Ew2cb6qN1Kj399DYDMUz",
         "liquidityUSD": 100000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:38.002Z"
+        "createdAt": "2026-05-03T04:06:38.002Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:47.006Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDT-DAI-Large",
@@ -299,7 +347,10 @@
         "feeAccount": "FdP14DJYNBKe7KgqMET6SmfPZLme3tsA1eNP7vutxroJ",
         "liquidityUSD": 400000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:47.744Z"
+        "createdAt": "2026-05-03T04:06:47.744Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:47.008Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "USDT-DAI-XL",
@@ -312,7 +363,10 @@
         "feeAccount": "2DgjyPWhQ173dhYruxDqNZSMb8WTcv44MupRpy9pUjYY",
         "liquidityUSD": 2000000,
         "feeBps": 5,
-        "createdAt": "2026-05-03T04:06:58.495Z"
+        "createdAt": "2026-05-03T04:06:58.495Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:47.009Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ],
     "WETH-WBTC": [
@@ -327,7 +381,10 @@
         "feeAccount": "DdRx6rsvUUSZcAUowWKB3JxnaZ8WocUWGzZY8Y7Pk33e",
         "liquidityUSD": 20000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:08:09.710Z"
+        "createdAt": "2026-05-03T04:08:09.710Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:51.413Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-WBTC-Medium",
@@ -340,7 +397,10 @@
         "feeAccount": "3TWFNHfk6pwc8N2AhAeDhQGABAS75mduXUHa2Rb8p5wg",
         "liquidityUSD": 100000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:08:19.676Z"
+        "createdAt": "2026-05-03T04:08:19.676Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:51.415Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-WBTC-Large",
@@ -353,7 +413,10 @@
         "feeAccount": "HZbiwRtJRrhVAyUbqW1AKew4pWk2HKSAEUnh8B8D5vJf",
         "liquidityUSD": 400000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:08:30.156Z"
+        "createdAt": "2026-05-03T04:08:30.156Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:51.416Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-WBTC-XL",
@@ -366,7 +429,10 @@
         "feeAccount": "7HVX4oyTbwC4HH8nQJxhpnAGmZ7QmaeAFeneXzG4rRcv",
         "liquidityUSD": 2000000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:08:39.787Z"
+        "createdAt": "2026-05-03T04:08:39.787Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:51.416Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ],
     "WETH-USDT": [
@@ -381,7 +447,10 @@
         "feeAccount": "HQ7HTxgFVLJDhKKBeUw7euwHaprKSUw6gL3JsAQy3tq7",
         "liquidityUSD": 20000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:08:50.105Z"
+        "createdAt": "2026-05-03T04:08:50.105Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:52.544Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-USDT-Medium",
@@ -394,7 +463,10 @@
         "feeAccount": "CMYZwrFEDowxhKs8meefdx2nUjopKANWLL2cbtLK82Ty",
         "liquidityUSD": 100000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:09:00.234Z"
+        "createdAt": "2026-05-03T04:09:00.234Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:52.544Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-USDT-Large",
@@ -407,7 +479,10 @@
         "feeAccount": "3WuyuDzysTBomoT5azjfhUdqWQY4ns57efELWD9vytdu",
         "liquidityUSD": 400000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:09:11.047Z"
+        "createdAt": "2026-05-03T04:09:11.047Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:52.544Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       },
       {
         "name": "WETH-USDT-XL",
@@ -420,7 +495,10 @@
         "feeAccount": "8PgTaHxg3FcUk1BHefJR51Ar7ZvVKJxMYe67B1nGLd1b",
         "liquidityUSD": 2000000,
         "feeBps": 10,
-        "createdAt": "2026-05-03T04:09:19.997Z"
+        "createdAt": "2026-05-03T04:09:19.997Z",
+        "inactive": true,
+        "deactivatedAt": "2026-05-11T12:50:52.545Z",
+        "deactivationReason": "TVL $0 below $100 threshold"
       }
     ]
   }

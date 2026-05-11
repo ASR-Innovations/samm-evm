@@ -153,7 +153,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/tokens</span>
     <span class="ep-desc">All supported tokens with mint addresses</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Returns all tokens supported by this deployment with their mint addresses and decimals.</p>
     <div class="try-it">
       <h4>Try it</h4>
@@ -171,7 +171,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/stats</span>
     <span class="ep-desc">DEX-wide aggregate statistics</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Returns total TVL, pair count, shard count, and per-pair liquidity breakdown.</p>
     <div class="try-it">
       <h4>Try it</h4>
@@ -190,7 +190,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/pools</span>
     <span class="ep-desc">All pool shards with live TVL</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Returns all 29 pool shards across 8 trading pairs with live on-chain reserves and TVL computed from oracle prices. Inactive shards are flagged.</p>
     <div class="try-it">
       <h4>Try it</h4>
@@ -208,7 +208,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/pools/:tokenA/:tokenB</span>
     <span class="ep-desc">Shards for a specific pair</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <table>
       <tr><th>Param</th><th>Type</th><th>Description</th></tr>
       <tr><td>tokenA<span class="required">required</span></td><td>string</td><td>Symbol of token A (e.g. WETH)</td></tr>
@@ -236,7 +236,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/price/:tokenA/:tokenB</span>
     <span class="ep-desc">Live spot price vs oracle</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Returns the current pool spot price and its deviation from the CoinGecko oracle. Used by the arb bot to detect imbalances.</p>
     <table>
       <tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -266,7 +266,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/balances/:address</span>
     <span class="ep-desc">All token balances for a wallet</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <table>
       <tr><th>Param</th><th>Type</th><th>Description</th></tr>
       <tr><td>address<span class="required">required</span></td><td>string</td><td>Solana wallet public key (base58)</td></tr>
@@ -291,7 +291,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/balance/:address/:token</span>
     <span class="ep-desc">Single token balance</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <div class="try-it">
       <h4>Try it</h4>
       <div class="form-row">
@@ -315,7 +315,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/quote/:tokenIn/:tokenOut/:amountOut</span>
     <span class="ep-desc">Routing quote — no transaction</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Computes the best route and required input amount for an exact-output swap. Uses c-Non-Splitting and Smaller-Better shard selection. No transaction is submitted.</p>
     <table>
       <tr><th>Param</th><th>Type</th><th>Description</th></tr>
@@ -347,7 +347,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/quote</span>
     <span class="ep-desc">Routing quote via JSON body</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Same as GET /quote but accepts a JSON body. Useful for programmatic access.</p>
     <table>
       <tr><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -372,7 +372,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/swap</span>
     <span class="ep-desc">Execute on-chain swap via router</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Executes an atomic exact-output swap through the on-chain SAMM router. The server's keypair signs. Supports 1-hop and 2-hop routes. All shards selected by the on-chain router program in a single transaction.</p>
     <table>
       <tr><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -409,7 +409,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/faucet</span>
     <span class="ep-desc">Mint test tokens (devnet only)</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Mints test tokens to any wallet. Server is the mint authority. Caps: USDC/USDT/DAI ≤ 10,000 · WETH ≤ 5 · WBTC ≤ 0.1 per call.</p>
     <table>
       <tr><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -439,7 +439,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/arbitrage/status</span>
     <span class="ep-desc">Arb bot state and cycle stats</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Returns whether the arb bot is running, cumulative swap count, total volume, and recent cycle history.</p>
     <div class="try-it">
       <h4>Try it</h4>
@@ -457,7 +457,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/arbitrage/start</span>
     <span class="ep-desc">Start the arbitrage bot</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <div class="try-it">
       <h4>Try it</h4>
       <button class="btn post-btn" onclick="reqPost('/arbitrage/start','{}','arb-start-res')">Start Bot</button>
@@ -474,7 +474,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/arbitrage/stop</span>
     <span class="ep-desc">Stop the arbitrage bot</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <div class="try-it">
       <h4>Try it</h4>
       <button class="btn post-btn" onclick="reqPost('/arbitrage/stop','{}','arb-stop-res')">Stop Bot</button>
@@ -491,7 +491,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/sharding/status</span>
     <span class="ep-desc">Dynamic shard manager state</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Returns shard manager running state, current shard counts per pair, and TVL thresholds.</p>
     <div class="try-it">
       <h4>Try it</h4>
@@ -509,7 +509,7 @@ code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5p
     <span class="ep-path">/sharding/check</span>
     <span class="ep-desc">Trigger a manual shard manager cycle</span>
   </div>
-  <div class="ep-body">
+  <div class="ep-body open">
     <p>Forces an immediate shard rebalance check — deactivates low-TVL shards, reactivates recovered ones, proposes new shards if needed.</p>
     <div class="try-it">
       <h4>Try it</h4>
@@ -637,8 +637,11 @@ window.addEventListener('scroll',()=>{
   });
 },{passive:true});
 
-// Auto-test connection on load
-window.addEventListener('load',testConn);
+// Auto-test connection and load health on page load
+window.addEventListener('load',()=>{
+  testConn();
+  req('GET','/health',null,'health-res');
+});
 </script>
 </body>
 </html>

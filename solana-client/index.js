@@ -189,11 +189,15 @@ function swapInstruction({
 
 /**
  * Build a DepositAllTokenTypes instruction (opcode 2).
+ * Account layout (14 accounts) matches processor.rs process_deposit_all_token_types:
+ *   tokenSwap, authority, userTransferAuthority(signer), depositTokenA, depositTokenB,
+ *   swapTokenA, swapTokenB, poolMint, destination, mintA, mintB,
+ *   tokenProgramIdA, tokenProgramIdB, poolTokenProgramId
  */
 function depositAllInstruction({
   programId, tokenSwap, authority, userTransferAuthority,
   depositTokenA, depositTokenB, swapTokenA, swapTokenB,
-  poolMint, destination,
+  poolMint, destination, mintA, mintB,
   tokenProgramIdA = TOKEN_PROGRAM_ID,
   tokenProgramIdB = TOKEN_PROGRAM_ID,
   poolTokenProgramId = TOKEN_PROGRAM_ID,
@@ -215,6 +219,8 @@ function depositAllInstruction({
     { pubkey: pk(swapTokenB),            isSigner: false, isWritable: true  },
     { pubkey: pk(poolMint),              isSigner: false, isWritable: true  },
     { pubkey: pk(destination),           isSigner: false, isWritable: true  },
+    { pubkey: pk(mintA),                 isSigner: false, isWritable: false },
+    { pubkey: pk(mintB),                 isSigner: false, isWritable: false },
     { pubkey: pk(tokenProgramIdA),       isSigner: false, isWritable: false },
     { pubkey: pk(tokenProgramIdB),       isSigner: false, isWritable: false },
     { pubkey: pk(poolTokenProgramId),    isSigner: false, isWritable: false },
@@ -225,11 +231,16 @@ function depositAllInstruction({
 
 /**
  * Build a WithdrawAllTokenTypes instruction (opcode 3).
+ * Account layout (15 accounts) matches processor.rs process_withdraw_all_token_types:
+ *   tokenSwap, authority, userTransferAuthority(signer), poolMint, sourcePoolAccount,
+ *   swapTokenA, swapTokenB, withdrawTokenA, withdrawTokenB, feeAccount,
+ *   mintA, mintB, poolTokenProgramId, tokenProgramIdA, tokenProgramIdB
  */
 function withdrawAllInstruction({
   programId, tokenSwap, authority, userTransferAuthority,
   sourcePoolAccount, swapTokenA, swapTokenB,
   withdrawTokenA, withdrawTokenB, poolMint, feeAccount,
+  mintA, mintB,
   tokenProgramIdA = TOKEN_PROGRAM_ID,
   tokenProgramIdB = TOKEN_PROGRAM_ID,
   poolTokenProgramId = TOKEN_PROGRAM_ID,
@@ -252,9 +263,11 @@ function withdrawAllInstruction({
     { pubkey: pk(withdrawTokenA),        isSigner: false, isWritable: true  },
     { pubkey: pk(withdrawTokenB),        isSigner: false, isWritable: true  },
     { pubkey: pk(feeAccount),            isSigner: false, isWritable: true  },
+    { pubkey: pk(mintA),                 isSigner: false, isWritable: false },
+    { pubkey: pk(mintB),                 isSigner: false, isWritable: false },
+    { pubkey: pk(poolTokenProgramId),    isSigner: false, isWritable: false },
     { pubkey: pk(tokenProgramIdA),       isSigner: false, isWritable: false },
     { pubkey: pk(tokenProgramIdB),       isSigner: false, isWritable: false },
-    { pubkey: pk(poolTokenProgramId),    isSigner: false, isWritable: false },
   ];
 
   return new TransactionInstruction({ keys, programId: pk(programId), data });
