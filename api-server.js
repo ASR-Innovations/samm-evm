@@ -32,6 +32,7 @@ process.on('unhandledRejection', (reason) => {
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // BigInt-safe JSON serialization (BigInt → string to avoid "Do not know how to serialize a BigInt")
 app.set('json replacer', (_key, val) => typeof val === 'bigint' ? val.toString() : val);
@@ -252,7 +253,8 @@ app.get('/pools', async (req, res) => {
           return { name: s.name, address: s.address, mintA: pd.mintA, mintB: pd.mintB,
             tokenA: pd.tokenA, tokenB: pd.tokenB,
             reserveA: pd.reserveA, reserveB: pd.reserveB,
-            liquidityUSD: Math.round(liq) };
+            liquidityUSD: Math.round(liq),
+            inactive: s.inactive || false };
         } catch (e) {
           return { name: s.name, address: s.address, error: e.message?.slice(0, 60) };
         }

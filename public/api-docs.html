@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMM DEX — API Playground</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--border:#30363d;--accent:#58a6ff;
+  --green:#3fb950;--red:#f85149;--yellow:#d29922;--text:#e6edf3;
+  --muted:#8b949e;--code-bg:#1f2428;--get:#1f6feb;--post:#238636;
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+
+/* Sidebar */
+nav{width:240px;min-width:240px;background:var(--surface);border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;padding:16px 0;flex-shrink:0}
+.nav-header{padding:12px 16px 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.nav-header h1{font-size:15px;font-weight:700;color:var(--text)}
+.nav-header p{font-size:11px;color:var(--muted);margin-top:3px}
+.nav-section{padding:4px 16px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:12px;margin-bottom:2px}
+nav a{display:flex;align-items:center;gap:8px;padding:6px 16px;color:var(--muted);text-decoration:none;font-size:13px;border-radius:4px;margin:1px 8px;transition:all .15s}
+nav a:hover,nav a.active{background:rgba(88,166,255,.1);color:var(--accent)}
+.badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.get{background:var(--get);color:#fff}.post{background:var(--post);color:#fff}
+
+/* Main */
+main{flex:1;padding:32px;max-width:900px}
+.page-header{margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.page-header h1{font-size:24px;font-weight:700}
+.page-header p{color:var(--muted);margin-top:6px;font-size:13px}
+.mono{font-family:ui-monospace,monospace;font-size:12px;color:var(--accent)}
+
+/* Endpoint card */
+.endpoint{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;overflow:hidden}
+.ep-header{padding:14px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.ep-header:hover{background:rgba(255,255,255,.02)}
+.ep-method{font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.ep-path{font-family:ui-monospace,monospace;font-size:13px;font-weight:600}
+.ep-desc{color:var(--muted);font-size:12px;margin-left:auto}
+.ep-body{padding:18px;border-top:1px solid var(--border);display:none}
+.ep-body.open{display:block}
+
+/* Params table */
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th{text-align:left;padding:6px 10px;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase}
+td{padding:7px 10px;font-size:12px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:top}
+td:first-child{font-family:ui-monospace,monospace;color:var(--accent)}
+.required{color:var(--red);font-size:10px;font-weight:700;margin-left:4px}
+.optional{color:var(--muted);font-size:10px;margin-left:4px}
+
+/* Try it */
+.try-it{background:var(--code-bg);border-radius:6px;padding:16px;margin-top:14px}
+.try-it h4{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em}
+.form-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.form-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px}
+.form-group label{font-size:11px;color:var(--muted)}
+input,select,textarea{background:#0d1117;border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-size:12px;font-family:inherit;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{font-family:ui-monospace,monospace;resize:vertical;min-height:60px}
+.btn{padding:7px 14px;background:var(--get);color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .15s;white-space:nowrap}
+.btn:hover{opacity:.85}
+.btn.post-btn{background:var(--post)}
+.response-box{margin-top:12px;background:#0d1117;border:1px solid var(--border);border-radius:4px;padding:12px;font-family:ui-monospace,monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:320px;overflow-y:auto;display:none}
+.response-box.show{display:block}
+.status-ok{color:var(--green)}.status-err{color:var(--red)}
+
+/* Shard table */
+.shard-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.shard-card{background:var(--code-bg);border-radius:4px;padding:10px 12px;font-size:11px}
+.shard-card .shard-name{font-weight:600;color:var(--accent);margin-bottom:4px}
+.shard-card .addr{font-family:ui-monospace,monospace;color:var(--muted);font-size:10px;word-break:break-all}
+
+/* Token badges */
+.tokens{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.token{background:var(--code-bg);border-radius:6px;padding:8px 12px;font-size:12px}
+.token .sym{font-weight:700;font-size:14px;margin-bottom:2px}
+.token .mint{font-family:ui-monospace,monospace;font-size:10px;color:var(--muted);word-break:break-all}
+
+h3{font-size:14px;font-weight:600;margin:20px 0 8px}
+h3:first-child{margin-top:0}
+p{color:var(--muted);font-size:12px;line-height:1.6;margin-bottom:10px}
+code{font-family:ui-monospace,monospace;background:var(--code-bg);padding:1px 5px;border-radius:3px;font-size:11px;color:var(--accent)}
+.section{margin-bottom:48px;scroll-margin-top:24px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-header">
+    <h1>SAMM DEX API</h1>
+    <p>Solana Devnet · v0.3</p>
+  </div>
+  <div class="nav-section">System</div>
+  <a href="#health"><span class="badge get">GET</span> /health</a>
+  <a href="#tokens"><span class="badge get">GET</span> /tokens</a>
+  <a href="#stats"><span class="badge get">GET</span> /stats</a>
+  <div class="nav-section">Pools</div>
+  <a href="#pools"><span class="badge get">GET</span> /pools</a>
+  <a href="#pools-pair"><span class="badge get">GET</span> /pools/:A/:B</a>
+  <a href="#price"><span class="badge get">GET</span> /price/:A/:B</a>
+  <div class="nav-section">Balances</div>
+  <a href="#balances"><span class="badge get">GET</span> /balances/:addr</a>
+  <a href="#balance"><span class="badge get">GET</span> /balance/:addr/:token</a>
+  <div class="nav-section">Trading</div>
+  <a href="#quote-get"><span class="badge get">GET</span> /quote/:in/:out/:amt</a>
+  <a href="#quote-post"><span class="badge post">POST</span> /quote</a>
+  <a href="#swap"><span class="badge post">POST</span> /swap</a>
+  <div class="nav-section">Faucet</div>
+  <a href="#faucet"><span class="badge post">POST</span> /faucet</a>
+  <div class="nav-section">Bot Controls</div>
+  <a href="#arb-status"><span class="badge get">GET</span> /arbitrage/status</a>
+  <a href="#arb-start"><span class="badge post">POST</span> /arbitrage/start</a>
+  <a href="#arb-stop"><span class="badge post">POST</span> /arbitrage/stop</a>
+  <a href="#shard-status"><span class="badge get">GET</span> /sharding/status</a>
+  <a href="#shard-check"><span class="badge post">POST</span> /sharding/check</a>
+  <div class="nav-section">Reference</div>
+  <a href="#ref-tokens">Token Mints</a>
+  <a href="#ref-pools">Pool Addresses</a>
+</nav>
+
+<main>
+<div class="page-header">
+  <h1>SAMM DEX API Playground</h1>
+  <p>Sharded Automated Market Maker · Solana Devnet · Program: <span class="mono">AvtCT5zyjHWMjVDepZUnJWNGJQeJfrk84ZtvhuaECrUZ</span></p>
+  <p style="margin-top:6px">Router: <span class="mono">DHwrqPKt3m2zXSiA57h97Z1zuyYE3s2KTwhnnAkaHVPu</span></p>
+  <p style="margin-top:10px">Base URL: <input id="baseUrl" style="width:260px;display:inline-block" value="http://localhost:3000"> <button class="btn" onclick="testConn()">Test Connection</button> <span id="connStatus" style="margin-left:8px;font-size:12px"></span></p>
+</div>
+
+<!-- ── SYSTEM ─────────────────────────────────────────────────── -->
+<div class="section" id="health">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/health</span>
+    <span class="ep-desc">Server status, oracle prices, bot state</span>
+  </div>
+  <div class="ep-body open">
+    <p>Returns server health including oracle prices, wallet balance, arb bot state, and shard manager status.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn" onclick="req('GET','/health',null,'health-res')">Send Request</button>
+      <div class="response-box" id="health-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="tokens">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/tokens</span>
+    <span class="ep-desc">All supported tokens with mint addresses</span>
+  </div>
+  <div class="ep-body">
+    <p>Returns all tokens supported by this deployment with their mint addresses and decimals.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn" onclick="req('GET','/tokens',null,'tokens-res')">Send Request</button>
+      <div class="response-box" id="tokens-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="stats">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/stats</span>
+    <span class="ep-desc">DEX-wide aggregate statistics</span>
+  </div>
+  <div class="ep-body">
+    <p>Returns total TVL, pair count, shard count, and per-pair liquidity breakdown.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn" onclick="req('GET','/stats',null,'stats-res')">Send Request</button>
+      <div class="response-box" id="stats-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── POOLS ──────────────────────────────────────────────────── -->
+<div class="section" id="pools">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/pools</span>
+    <span class="ep-desc">All pool shards with live TVL</span>
+  </div>
+  <div class="ep-body">
+    <p>Returns all 29 pool shards across 8 trading pairs with live on-chain reserves and TVL computed from oracle prices. Inactive shards are flagged.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn" onclick="req('GET','/pools',null,'pools-res')">Send Request</button>
+      <div class="response-box" id="pools-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="pools-pair">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/pools/:tokenA/:tokenB</span>
+    <span class="ep-desc">Shards for a specific pair</span>
+  </div>
+  <div class="ep-body">
+    <table>
+      <tr><th>Param</th><th>Type</th><th>Description</th></tr>
+      <tr><td>tokenA<span class="required">required</span></td><td>string</td><td>Symbol of token A (e.g. WETH)</td></tr>
+      <tr><td>tokenB<span class="required">required</span></td><td>string</td><td>Symbol of token B (e.g. USDC)</td></tr>
+    </table>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <div class="form-row">
+        <div class="form-group"><label>tokenA</label>
+          <select id="pp-a"><option>USDC</option><option>USDT</option><option selected>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+        <div class="form-group"><label>tokenB</label>
+          <select id="pp-b"><option selected>USDC</option><option>USDT</option><option>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+      </div>
+      <button class="btn" onclick="req('GET','/pools/'+v('pp-a')+'/'+v('pp-b'),null,'ppair-res')">Send Request</button>
+      <div class="response-box" id="ppair-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="price">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/price/:tokenA/:tokenB</span>
+    <span class="ep-desc">Live spot price vs oracle</span>
+  </div>
+  <div class="ep-body">
+    <p>Returns the current pool spot price and its deviation from the CoinGecko oracle. Used by the arb bot to detect imbalances.</p>
+    <table>
+      <tr><th>Param</th><th>Type</th><th>Description</th></tr>
+      <tr><td>tokenA<span class="required">required</span></td><td>string</td><td>Numerator token (e.g. USDC)</td></tr>
+      <tr><td>tokenB<span class="required">required</span></td><td>string</td><td>Denominator token (e.g. WETH)</td></tr>
+    </table>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <div class="form-row">
+        <div class="form-group"><label>tokenA</label>
+          <select id="pr-a"><option selected>USDC</option><option>USDT</option><option>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+        <div class="form-group"><label>tokenB</label>
+          <select id="pr-b"><option>USDC</option><option>USDT</option><option selected>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+      </div>
+      <button class="btn" onclick="req('GET','/price/'+v('pr-a')+'/'+v('pr-b'),null,'price-res')">Send Request</button>
+      <div class="response-box" id="price-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── BALANCES ───────────────────────────────────────────────── -->
+<div class="section" id="balances">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/balances/:address</span>
+    <span class="ep-desc">All token balances for a wallet</span>
+  </div>
+  <div class="ep-body">
+    <table>
+      <tr><th>Param</th><th>Type</th><th>Description</th></tr>
+      <tr><td>address<span class="required">required</span></td><td>string</td><td>Solana wallet public key (base58)</td></tr>
+    </table>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <div class="form-row">
+        <div class="form-group" style="flex:3"><label>Wallet address</label>
+          <input id="bal-addr" value="3192e7asquzj5KwXgjer1CfWKGBK8Y5ECo3qWjsjNfVc"></div>
+      </div>
+      <button class="btn" onclick="req('GET','/balances/'+v('bal-addr'),null,'bals-res')">Send Request</button>
+      <div class="response-box" id="bals-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="balance">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/balance/:address/:token</span>
+    <span class="ep-desc">Single token balance</span>
+  </div>
+  <div class="ep-body">
+    <div class="try-it">
+      <h4>Try it</h4>
+      <div class="form-row">
+        <div class="form-group" style="flex:3"><label>Wallet address</label>
+          <input id="bal1-addr" value="3192e7asquzj5KwXgjer1CfWKGBK8Y5ECo3qWjsjNfVc"></div>
+        <div class="form-group"><label>Token</label>
+          <select id="bal1-token"><option>USDC</option><option>USDT</option><option>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+      </div>
+      <button class="btn" onclick="req('GET','/balance/'+v('bal1-addr')+'/'+v('bal1-token'),null,'bal1-res')">Send Request</button>
+      <div class="response-box" id="bal1-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── TRADING ────────────────────────────────────────────────── -->
+<div class="section" id="quote-get">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/quote/:tokenIn/:tokenOut/:amountOut</span>
+    <span class="ep-desc">Routing quote — no transaction</span>
+  </div>
+  <div class="ep-body">
+    <p>Computes the best route and required input amount for an exact-output swap. Uses c-Non-Splitting and Smaller-Better shard selection. No transaction is submitted.</p>
+    <table>
+      <tr><th>Param</th><th>Type</th><th>Description</th></tr>
+      <tr><td>tokenIn<span class="required">required</span></td><td>string</td><td>Token symbol being sold (USDC, WETH, WBTC, DAI, USDT)</td></tr>
+      <tr><td>tokenOut<span class="required">required</span></td><td>string</td><td>Token symbol being bought</td></tr>
+      <tr><td>amountOut<span class="required">required</span></td><td>number</td><td>Exact amount to receive, in human units (e.g. 0.001 for 0.001 WETH)</td></tr>
+    </table>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <div class="form-row">
+        <div class="form-group"><label>tokenIn</label>
+          <select id="qg-in"><option selected>USDC</option><option>USDT</option><option>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+        <div class="form-group"><label>tokenOut</label>
+          <select id="qg-out"><option>USDC</option><option>USDT</option><option selected>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+        <div class="form-group"><label>amountOut</label>
+          <input id="qg-amt" value="0.001"></div>
+      </div>
+      <button class="btn" onclick="req('GET','/quote/'+v('qg-in')+'/'+v('qg-out')+'/'+v('qg-amt'),null,'qg-res')">Send Request</button>
+      <div class="response-box" id="qg-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="quote-post">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method post">POST</span>
+    <span class="ep-path">/quote</span>
+    <span class="ep-desc">Routing quote via JSON body</span>
+  </div>
+  <div class="ep-body">
+    <p>Same as GET /quote but accepts a JSON body. Useful for programmatic access.</p>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td>tokenIn<span class="required">required</span></td><td>string</td><td>Token symbol being sold</td></tr>
+      <tr><td>tokenOut<span class="required">required</span></td><td>string</td><td>Token symbol being bought</td></tr>
+      <tr><td>amountOut<span class="required">required</span></td><td>string</td><td>Exact output amount in human units</td></tr>
+    </table>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <textarea id="qp-body">{"tokenIn":"USDC","tokenOut":"WETH","amountOut":"0.001"}</textarea>
+      <br><button class="btn post-btn" style="margin-top:8px" onclick="reqPost('/quote',v('qp-body'),'qp-res')">Send Request</button>
+      <div class="response-box" id="qp-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="swap">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method post">POST</span>
+    <span class="ep-path">/swap</span>
+    <span class="ep-desc">Execute on-chain swap via router</span>
+  </div>
+  <div class="ep-body">
+    <p>Executes an atomic exact-output swap through the on-chain SAMM router. The server's keypair signs. Supports 1-hop and 2-hop routes. All shards selected by the on-chain router program in a single transaction.</p>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td>tokenIn<span class="required">required</span></td><td>string</td><td>Token being sold</td></tr>
+      <tr><td>tokenOut<span class="required">required</span></td><td>string</td><td>Token being bought</td></tr>
+      <tr><td>amountOut<span class="required">required</span></td><td>string</td><td>Exact output in human units</td></tr>
+      <tr><td>slippagePct<span class="optional">optional</span></td><td>string</td><td>Max slippage % (default "1.0")</td></tr>
+    </table>
+    <p style="margin-top:8px"><strong>Supported routes:</strong> USDC↔USDT, USDC↔DAI, DAI↔USDT, WETH↔USDC, WETH↔USDT, WBTC↔USDC, WBTC→USDT, WBTC→DAI, WETH→DAI, DAI→WETH</p>
+    <div class="try-it">
+      <h4>Try it — executes a REAL on-chain transaction</h4>
+      <div class="form-row">
+        <div class="form-group"><label>tokenIn</label>
+          <select id="sw-in"><option selected>USDC</option><option>USDT</option><option>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+        <div class="form-group"><label>tokenOut</label>
+          <select id="sw-out"><option>USDC</option><option>USDT</option><option selected>WETH</option><option>WBTC</option><option>DAI</option></select></div>
+        <div class="form-group"><label>amountOut</label>
+          <input id="sw-amt" value="0.001"></div>
+        <div class="form-group"><label>slippagePct</label>
+          <input id="sw-slip" value="1.0"></div>
+      </div>
+      <button class="btn post-btn" onclick="reqPost('/swap',JSON.stringify({tokenIn:v('sw-in'),tokenOut:v('sw-out'),amountOut:v('sw-amt'),slippagePct:v('sw-slip')}),'sw-res')">Send Transaction</button>
+      <div class="response-box" id="sw-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── FAUCET ─────────────────────────────────────────────────── -->
+<div class="section" id="faucet">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method post">POST</span>
+    <span class="ep-path">/faucet</span>
+    <span class="ep-desc">Mint test tokens (devnet only)</span>
+  </div>
+  <div class="ep-body">
+    <p>Mints test tokens to any wallet. Server is the mint authority. Caps: USDC/USDT/DAI ≤ 10,000 · WETH ≤ 5 · WBTC ≤ 0.1 per call.</p>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td>address<span class="required">required</span></td><td>string</td><td>Recipient wallet public key</td></tr>
+      <tr><td>tokens<span class="required">required</span></td><td>object</td><td>Map of symbol → amount (e.g. {"USDC":100})</td></tr>
+    </table>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <div class="form-row">
+        <div class="form-group" style="flex:2"><label>Recipient address</label>
+          <input id="fct-addr" value="3192e7asquzj5KwXgjer1CfWKGBK8Y5ECo3qWjsjNfVc"></div>
+      </div>
+      <div class="form-group"><label>Tokens JSON</label>
+        <textarea id="fct-tokens">{"USDC": 100, "WETH": 0.01}</textarea></div>
+      <button class="btn post-btn" style="margin-top:8px" onclick="faucetReq()">Mint Tokens</button>
+      <div class="response-box" id="fct-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── BOT CONTROLS ───────────────────────────────────────────── -->
+<div class="section" id="arb-status">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/arbitrage/status</span>
+    <span class="ep-desc">Arb bot state and cycle stats</span>
+  </div>
+  <div class="ep-body">
+    <p>Returns whether the arb bot is running, cumulative swap count, total volume, and recent cycle history.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn" onclick="req('GET','/arbitrage/status',null,'arb-st-res')">Send Request</button>
+      <div class="response-box" id="arb-st-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="arb-start">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method post">POST</span>
+    <span class="ep-path">/arbitrage/start</span>
+    <span class="ep-desc">Start the arbitrage bot</span>
+  </div>
+  <div class="ep-body">
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn post-btn" onclick="reqPost('/arbitrage/start','{}','arb-start-res')">Start Bot</button>
+      <div class="response-box" id="arb-start-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="arb-stop">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method post">POST</span>
+    <span class="ep-path">/arbitrage/stop</span>
+    <span class="ep-desc">Stop the arbitrage bot</span>
+  </div>
+  <div class="ep-body">
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn post-btn" onclick="reqPost('/arbitrage/stop','{}','arb-stop-res')">Stop Bot</button>
+      <div class="response-box" id="arb-stop-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="shard-status">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method get">GET</span>
+    <span class="ep-path">/sharding/status</span>
+    <span class="ep-desc">Dynamic shard manager state</span>
+  </div>
+  <div class="ep-body">
+    <p>Returns shard manager running state, current shard counts per pair, and TVL thresholds.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn" onclick="req('GET','/sharding/status',null,'sh-st-res')">Send Request</button>
+      <div class="response-box" id="sh-st-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section" id="shard-check">
+<div class="endpoint">
+  <div class="ep-header" onclick="toggle(this)">
+    <span class="ep-method post">POST</span>
+    <span class="ep-path">/sharding/check</span>
+    <span class="ep-desc">Trigger a manual shard manager cycle</span>
+  </div>
+  <div class="ep-body">
+    <p>Forces an immediate shard rebalance check — deactivates low-TVL shards, reactivates recovered ones, proposes new shards if needed.</p>
+    <div class="try-it">
+      <h4>Try it</h4>
+      <button class="btn post-btn" onclick="reqPost('/sharding/check','{}','sh-chk-res')">Run Check</button>
+      <div class="response-box" id="sh-chk-res"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ── REFERENCE ──────────────────────────────────────────────── -->
+<div class="section" id="ref-tokens">
+<h3>Token Mints (Devnet)</h3>
+<div class="tokens">
+  <div class="token"><div class="sym">USDC</div><div>Decimals: 6</div><div class="mint">8NYkWmgtd5Sd2YfitVoQviWNY8wtDXTuH4bykDP3yZKM</div></div>
+  <div class="token"><div class="sym">USDT</div><div>Decimals: 6</div><div class="mint">5MVkBousJgvBwynVCw8oqAb5vNoyVaB59MGMRybLmpW7</div></div>
+  <div class="token"><div class="sym">WETH</div><div>Decimals: 9</div><div class="mint">CC9VEegiHtEet2LXWoLWwt1QdEjPFgBtwLDAxnB6xVk7</div></div>
+  <div class="token"><div class="sym">WBTC</div><div>Decimals: 8</div><div class="mint">yhD6NWN78cZSZcbfiyVrvBMSDjQEiEnDEc2PgFdURku</div></div>
+  <div class="token"><div class="sym">DAI</div><div>Decimals: 9</div><div class="mint">7EPCJuQFajxDQzbhA7LKmCsZfr4H43a6GX5oULQjdpNs</div></div>
+</div>
+</div>
+
+<div class="section" id="ref-pools">
+<h3>Pool Shard Addresses (27 active)</h3>
+<div class="shard-grid">
+  <div class="shard-card"><div class="shard-name">USDC-USDT · Small</div><div class="addr">AaCzwwGiuBUaLwyj6ComyMBWWhfLZwGncCUdhzpcsTGT</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-USDT · Medium</div><div class="addr">HYcqqLeofeuJHYJivnSbJegGX2dS13ifxxW5S5CF6Rnd</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-USDT · Large</div><div class="addr">7ypNMju4UcwA4hQYUkNm3vv62a6uzNA8vggMeg19Xzmr</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-USDT · XL</div><div class="addr">BxgLJLZSYVdHJ9LQ2kgKBNnsgmQmL44eU6qJ2PyJ9J72</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDC · Medium</div><div class="addr">JBatFMGXjapf4sHfhWdnWC25irQ8S6Gu72oUCt7zTRsD</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDC · Large</div><div class="addr">AJLUAP8VXBmCovsjq1r1H8KoqqJ6xYawsGAQV4TD6Wdgf</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDC · XL</div><div class="addr">4faBmJPGPjHCdt3GMy57fjJwDmsU5GbaWjqJ3Tk9timp</div></div>
+  <div class="shard-card"><div class="shard-name">WBTC-USDC · Medium</div><div class="addr">8ZGE1QBDFRMBuj1ZXABnzxpSD8CwUt9KqUzoMcy4SYkB</div></div>
+  <div class="shard-card"><div class="shard-name">WBTC-USDC · Large</div><div class="addr">6wnREvxGMUESf5eNhBxiqGBf8x7BkpT9EDHYsjvdQW77</div></div>
+  <div class="shard-card"><div class="shard-name">WBTC-USDC · XL</div><div class="addr">4S2HJ7nYYNYu2uU5YphReYvnWwgdDy6cufngR1xoNpaV</div></div>
+  <div class="shard-card"><div class="shard-name">DAI-USDC · Small</div><div class="addr">ExaWxELZ3yKvq685txS7nCYE5thtZphLGCXFWobENUoN</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-DAI · Small</div><div class="addr">A9tqtkjUCVnrWZ6Am5N7KCJ1kJsnpu6YXD1nSuzb1ETk</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-DAI · Medium</div><div class="addr">GVdCMkMjhcuJcuBBpfohTVNGHLvvkKHf4DxhR1EgpTwP</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-DAI · Large</div><div class="addr">AK71KtZcSEv8ajtoYkHqVY55bAoJAyyQyTqN6r8Qpx8e</div></div>
+  <div class="shard-card"><div class="shard-name">USDC-DAI · XL</div><div class="addr">BMnBcRpkYcNqKe41qL2j5rLq6FTJRnVmJfdg18zJJPED</div></div>
+  <div class="shard-card"><div class="shard-name">USDT-DAI · Small</div><div class="addr">HFfjnASbjoxB33GFRt6Am8Z5ne4RPoQLYmaRCb9A4gH</div></div>
+  <div class="shard-card"><div class="shard-name">USDT-DAI · Medium</div><div class="addr">4nBZRd6mex85nLRVfNg5zcH7rey3qpqkf6r1LtB7Uf5R</div></div>
+  <div class="shard-card"><div class="shard-name">USDT-DAI · Large</div><div class="addr">8NMJoEayhYpKAiSi2Ne2jC1HkdxwjCqXqPybfP8zNDAU</div></div>
+  <div class="shard-card"><div class="shard-name">USDT-DAI · XL</div><div class="addr">4xPNrXnGqphkKjnNMWwqXyJvfFEDXRxo9Tp1KpoVK374</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-WBTC · Small</div><div class="addr">8J5siYcTnFZUdeABDUqtWuPR2Wd935gmQFWWMo7C3w6n</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-WBTC · Medium</div><div class="addr">5AViEp8PxwQ85M7gmXzv9insRCCkuNRyJ3EaUrPFqrM8</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-WBTC · Large</div><div class="addr">9AXTrhnAqghMYVFkjCwY8ZyRJJTHx6vug9ERLDHQA5Xv</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-WBTC · XL</div><div class="addr">Ba5nDjwLJL8PpcJCzgnBQGxhAgmJaWHehEoQh9yCgGNe</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDT · Small</div><div class="addr">HyXDz7XTWG6JxFz2QHAcgfjxtxY8efud75y4egyt1qx4</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDT · Medium</div><div class="addr">CMM4Qpj2WNcYhXEp6q8WUm3TrLY1uL8oWAgFs5vRANzw</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDT · Large</div><div class="addr">DDXMhGbjn7g8mQ9UcXpJ9YQmEiEQMtRXzfRfrpE6mXzp</div></div>
+  <div class="shard-card"><div class="shard-name">WETH-USDT · XL</div><div class="addr">54HrDuNiiepAqy3JJF1oPq2CfpCC5o5pgZQ3vF83hrYS</div></div>
+</div>
+</div>
+
+</main>
+
+<script>
+const base=()=>document.getElementById('baseUrl').value.replace(/\/$/,'');
+const v=id=>document.getElementById(id).value;
+
+function toggle(hdr){
+  const body=hdr.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+async function testConn(){
+  const el=document.getElementById('connStatus');
+  el.textContent='Testing...';el.style.color='#8b949e';
+  try{
+    const r=await fetch(base()+'/health',{signal:AbortSignal.timeout(4000)});
+    const d=await r.json();
+    el.textContent='Connected ✓ '+d.status;el.style.color='#3fb950';
+  }catch(e){
+    el.textContent='Failed: '+e.message;el.style.color='#f85149';
+  }
+}
+
+function showResponse(elId,status,data){
+  const el=document.getElementById(elId);
+  el.classList.add('show');
+  const statusLine=(status>=200&&status<300)?'<span class="status-ok">HTTP '+status+'</span>':'<span class="status-err">HTTP '+status+'</span>';
+  el.innerHTML=statusLine+'\n\n'+JSON.stringify(data,null,2);
+}
+
+async function req(method,path,body,resId){
+  const el=document.getElementById(resId);
+  el.classList.add('show');el.textContent='Loading...';
+  try{
+    const opts={method,headers:{'Content-Type':'application/json'}};
+    if(body)opts.body=body;
+    const r=await fetch(base()+path,opts);
+    const d=await r.json().catch(()=>({raw:await r.text()}));
+    showResponse(resId,r.status,d);
+  }catch(e){
+    el.innerHTML='<span class="status-err">Error: '+e.message+'</span>';
+  }
+}
+
+function reqPost(path,bodyStr,resId){
+  let parsed;
+  try{parsed=JSON.stringify(JSON.parse(bodyStr));}catch{parsed=bodyStr;}
+  req('POST',path,parsed,resId);
+}
+
+function faucetReq(){
+  let tokens;
+  try{tokens=JSON.parse(v('fct-tokens'));}catch{
+    document.getElementById('fct-res').classList.add('show');
+    document.getElementById('fct-res').innerHTML='<span class="status-err">Invalid JSON in tokens field</span>';return;
+  }
+  req('POST','/faucet',JSON.stringify({address:v('fct-addr'),tokens}),'fct-res');
+}
+
+// Sidebar active highlight on scroll
+const sections=[...document.querySelectorAll('.section')];
+const links=[...document.querySelectorAll('nav a')];
+window.addEventListener('scroll',()=>{
+  let cur='';
+  for(const s of sections){
+    if(s.getBoundingClientRect().top<=80)cur=s.id;
+  }
+  links.forEach(l=>{
+    l.classList.toggle('active',l.getAttribute('href')==='#'+cur);
+  });
+},{passive:true});
+
+// Auto-test connection on load
+window.addEventListener('load',testConn);
+</script>
+</body>
+</html>
