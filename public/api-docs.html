@@ -602,7 +602,7 @@ async function req(method,path,body,resId){
     const opts={method,headers:{'Content-Type':'application/json'}};
     if(body)opts.body=body;
     const r=await fetch(base()+path,opts);
-    const d=await r.json().catch(()=>({raw:await r.text()}));
+    const d=await r.json().catch(async ()=>({raw:await r.text()}));
     showResponse(resId,r.status,d);
   }catch(e){
     el.innerHTML='<span class="status-err">Error: '+e.message+'</span>';
